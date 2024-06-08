@@ -7,3 +7,4 @@ tensorflow
 torch
 altair<5.0.0
 plotly
+scikit-learn
