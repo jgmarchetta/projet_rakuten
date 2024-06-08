@@ -91,6 +91,17 @@ def preprocess_data(df, _label_encoder):
     train_texts, val_texts, train_labels, val_labels = train_test_split(df["token_text"], df["prdtypecode"], test_size=0.2, random_state=42)
     return train_texts, val_texts, train_labels, val_labels
 
+# Chemins des fichiers CSV
+file_paths = [
+    r"D://streamlit//rakuten//X_train_update_part1.csv",
+    r"D://streamlit//rakuten//X_train_update_part2.csv",
+    r"D://streamlit//rakuten//X_train_update_part3.csv"
+]
+
+# Lecture des fichiers CSV et concaténation en un seul DataFrame
+dataframes = [pd.read_csv(file_path) for file_path in file_paths]
+df_train = pd.concat(dataframes, ignore_index=True)
+
 def tokenize_texts(_tokenizer, texts, max_len=128):
     encodings = _tokenizer(list(texts), truncation=True, padding=True, return_tensors="pt", max_length=max_len)
     return encodings
@@ -1148,4 +1159,3 @@ st.sidebar.markdown(f"""
 </a>
 """, unsafe_allow_html=True)
 st.sidebar.text("Datascientist - Bootcamp mars 2024")
-
