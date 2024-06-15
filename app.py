@@ -9,6 +9,7 @@ import torch
 import plotly.graph_objs as go
 import os
 import boto3
+
 from io import BytesIO
 from PIL import Image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -40,29 +41,23 @@ def load_data_from_s3(bucket_name, file_key):
         st.error(f"Erreur lors de la récupération de l'objet S3 : {e}")
         raise e
 
-def load_model_from_s3(bucket_name, model_key):
-    try:
-        obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
-        with open('/tmp/temp_model.keras', 'wb') as f:
-            f.write(obj['Body'].read())
-        model = load_model('/tmp/temp_model.keras')
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
-        return model
-    except ClientError as e:
-        st.error(f"Erreur lors de la récupération du modèle S3 : {e}")
-        raise e
-
 @st.cache_data
 def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
-    model = load_model_from_s3(bucket_name, model_key)
-
-    tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
-    tokenizer = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
-    
-    le_obj = s3_client.get_object(Bucket=bucket_name, Key=le_key)
-    le = pickle.load(BytesIO(le_obj['Body'].read()))
-    
-    return model, tokenizer, le
+    try:
+        model_obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
+        model = load_model(BytesIO(model_obj['Body'].read()))
+        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
+        
+        tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
+        tokenizer = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
+        
+        le_obj = s3_client.get_object(Bucket=bucket_name, Key=le_key)
+        le = pickle.load(BytesIO(le_obj['Body'].read()))
+        
+        return model, tokenizer, le
+    except ClientError as e:
+        st.error(f"Erreur lors du chargement des ressources S3 : {e}")
+        raise e
 
 # Define page configuration to use the full width of the screen
 st.set_page_config(layout="wide")
@@ -973,19 +968,15 @@ elif page == "Démo":
             # Charger les ressources pour la démo
             def load_demo_resources():
                 try:
-                    tokenizer_path_d = "tokenizer.pkl"
-                    le_path_d = "label_encoder.pkl"
-                    model_path_d = "model_EfficientNetB0-LSTM.keras"
-                    categories_csv_path_d = "categories_prdtypecode.csv"
+                    tokenizer_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='tokenizer.pkl')
+                    le_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='label_encoder.pkl')
+                    model_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='model_EfficientNetB0-LSTM.keras')
+                    categories_csv_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='categories_prdtypecode.csv')
 
-                    with open(tokenizer_path_d, 'rb') as handle:
-                        tokenizer_demo = pickle.load(handle)
-
-                    with open(le_path_d, 'rb') as handle:
-                        le_demo = pickle.load(handle)
-
-                    model_demo = tf.keras.models.load_model(model_path_d)
-                    categorie_demo = pd.read_csv(categories_csv_path_d, sep=';')
+                    tokenizer_demo = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
+                    le_demo = pickle.load(BytesIO(le_obj['Body'].read()))
+                    model_demo = load_model(BytesIO(model_obj['Body'].read()))
+                    categorie_demo = pd.read_csv(BytesIO(categories_csv_obj['Body'].read()), sep=';')
 
                     return tokenizer_demo, le_demo, model_demo, categorie_demo
 
@@ -1084,7 +1075,7 @@ elif page == "Démo":
                     """)
             
             # Charger et afficher le dataframe catégories
-            df_categorie = pd.read_csv("categories_prdtypecode.csv", sep=';')
+            df_categorie = pd.read_csv(BytesIO(categories_csv_obj['Body'].read()), sep=';')
             
             st.data_editor(
                 df_categorie,
@@ -1123,6 +1114,7 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
+
 
 
 
