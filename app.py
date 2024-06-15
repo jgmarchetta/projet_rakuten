@@ -45,7 +45,15 @@ def load_data_from_s3(bucket_name, file_key):
 def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
     try:
         model_obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
-        model = load_model(BytesIO(model_obj['Body'].read()))
+        model_file = BytesIO(model_obj['Body'].read())
+        
+        # Vérifier le format du fichier modèle et le convertir si nécessaire
+        try:
+            model = load_model(model_file)
+        except Exception as e:
+            st.warning(f"Le fichier n'est pas au format .keras v3 ou .h5 : {e}")
+            model = convert_and_load_model(model_file)
+
         model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
         
         tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
@@ -58,6 +66,26 @@ def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_k
     except ClientError as e:
         st.error(f"Erreur lors du chargement des ressources S3 : {e}")
         raise e
+
+def convert_and_load_model(model_file):
+    try:
+        # Sauvegarder temporairement le fichier téléchargé
+        with open("temp_model_file", "wb") as f:
+            f.write(model_file.getbuffer())
+
+        # Convertir et charger le modèle
+        temp_h5_model_path = "temp_model_file.h5"
+        model = tf.keras.models.load_model("temp_model_file")
+        model.save(temp_h5_model_path, save_format='h5')
+        
+        # Charger le modèle converti
+        model = tf.keras.models.load_model(temp_h5_model_path)
+        os.remove("temp_model_file")
+        os.remove(temp_h5_model_path)
+        return model
+    except Exception as e:
+        st.error(f"Erreur lors de la conversion du modèle : {e}")
+        return None
 
 # Define page configuration to use the full width of the screen
 st.set_page_config(layout="wide")
@@ -1114,7 +1142,3 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
-
-
-
-
