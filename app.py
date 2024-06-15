@@ -8,81 +8,45 @@ import tensorflow as tf
 import torch
 import plotly.graph_objs as go
 import os
-
+import boto3
+from io import BytesIO
 from PIL import Image
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import Sequential, load_model, Model
-from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from tensorflow.keras.preprocessing.sequence import pad_sequences # type: ignore
+from tensorflow.keras.preprocessing.image import load_img, img_to_array # type: ignore
+from tensorflow.keras.models import load_model # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
+from torch.utils.data import DataLoader, Dataset
 from streamlit_elements import elements, mui
 
-# Définir la configuration de la page pour utiliser toute la largeur de l'écran
-st.set_page_config(layout="wide")
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID = st.secrets["AWS_ACCESS_KEY_ID"]
+AWS_SECRET_ACCESS_KEY = st.secrets["AWS_SECRET_ACCESS_KEY"]
+AWS_BUCKET_NAME = st.secrets["AWS_BUCKET_NAME"]
 
-# Définir le CSS directement dans le script
-css = """
-<style>
-body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMarkdown, .stSidebar, .stTitle, .stHeader, .stRadio {
-    font-family: 'Arial', sans-serif;
-}
-.css-1d391kg, .css-18e3th9, .css-1l02zno, .css-1v3fvcr, .css-qbe2hs, .css-1y4p8pa {
-    font-family: 'Arial', sans-serif;
-}
-.small-title {
-    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
-    font-weight: bold;
-}
-.reduced-spacing p {
-    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
-    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
-}
-.red-title {
-    color: #BF0000;
-}
-.stRadio > div > div {
-    background-color: #BF0000 !important;
-}
-.center-title {
-    text-align: center;
-}
-</style>
-"""
+# Initialize Boto3 S3 client
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+)
 
-# Injecter le CSS dans l'application Streamlit
-st.markdown(css, unsafe_allow_html=True)
-
-st.sidebar.title("PROJET")
-
-# Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
-st.sidebar.markdown(f"""
-<a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
-    <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' style="width: 100%;">
-</a>
-""", unsafe_allow_html=True)
-
-st.sidebar.title("Sommaire")
-pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "Deep Learning", "Conclusion", "Démo"]
-page = st.sidebar.radio("Aller vers", pages)
+def load_data_from_s3(bucket_name, file_key):
+    obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+    return pd.read_csv(BytesIO(obj['Body'].read()))
 
 @st.cache_data
-def load_data(csv_path):
-    return pd.read_csv(csv_path)
-
-@st.cache_data
-def load_model_and_tokenizer(model_path, tokenizer_path, le_path):
-    model = load_model(model_path)
+def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
+    model_obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
+    model = load_model(BytesIO(model_obj['Body'].read()))
     model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
-    with open(tokenizer_path, 'rb') as handle:
-        tokenizer = pickle.load(handle)
-    with open(le_path, 'rb') as handle:
-        le = pickle.load(handle)
+    
+    tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
+    tokenizer = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
+    
+    le_obj = s3_client.get_object(Bucket=bucket_name, Key=le_key)
+    le = pickle.load(BytesIO(le_obj['Body'].read()))
+    
     return model, tokenizer, le
 
 @st.cache_data
@@ -159,6 +123,52 @@ def predict_and_evaluate(_model, loader, device):
 
     return np.array(predictions), np.array(true_labels), avg_val_accuracy, avg_val_loss
 
+# Définir la configuration de la page pour utiliser toute la largeur de l'écran
+st.set_page_config(layout="wide")
+
+# Définir le CSS directement dans le script
+css = """
+<style>
+body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMarkdown, .stSidebar, .stTitle, .stHeader, .stRadio {
+    font-family: 'Arial', sans-serif;
+}
+.css-1d391kg, .css-18e3th9, .css-1l02zno, .css-1v3fvcr, .css-qbe2hs, .css-1y4p8pa {
+    font-family: 'Arial', sans-serif;
+}
+.small-title {
+    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
+    font-weight: bold;
+}
+.reduced-spacing p {
+    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
+    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
+}
+.red-title {
+    color: #BF0000;
+}
+.stRadio > div > div {
+    background-color: #BF0000 !important;
+}
+.center-title {
+    text-align: center;
+}
+</style>
+"""
+
+# Injecter le CSS dans l'application Streamlit
+st.markdown(css, unsafe_allow_html=True)
+
+# Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
+st.sidebar.markdown(f"""
+<a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
+    <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' style="width: 100%;">
+</a>
+""", unsafe_allow_html=True)
+
+st.sidebar.title("Sommaire")
+pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "Deep Learning", "Conclusion", "Démo"]
+page = st.sidebar.radio("Aller vers:", pages)
+
 # Présentation du projet
 if page == "Présentation":
     st.markdown("<h1 class='red-title center-title'>Projet Rakuten - Classification Multimodal</h1>", unsafe_allow_html=True)
@@ -204,9 +214,9 @@ if page == "Données":
     selected_dataset = st.selectbox("**Sélectionnez le jeu de données :**", ["X_train", "X_test", "Y_train", "Fichier Images Train"])
 
     # Charger les données
-    df_train = load_data('X_train_update.csv')
-    df_test = load_data('X_test_update.csv')
-    df_target = load_data('Y_train_CVw08PX.csv')
+    df_train = load_data_from_s3(AWS_BUCKET_NAME, 'X_train_update.csv')
+    df_test = load_data_from_s3(AWS_BUCKET_NAME, 'X_test_update.csv')
+    df_target = load_data_from_s3(AWS_BUCKET_NAME, 'Y_train_CVw08PX.csv')
 
     # Fonctions pour afficher des graphiques
     def plot_missing_values_heatmap(df):
@@ -338,22 +348,22 @@ elif page == "Machine Learning":
     def add_model_expanders(images):
         with st.expander(f"**XGboost** Score F1-pondéré: {images['XGboost']['score']}"):
             st.write(f"Détails sur le modèle XGboost.")
-            st.image(images['XGboost']['path'], caption=None, width=650)
+            st.image(images['XGboost']['path'], caption=None, width=1200)
         with st.expander(f"**SGD Classifier** Score F1-pondéré: {images['SGD Classifier']['score']}"):
             st.write(f"Détails sur le modèle SGD Classifier.")
-            st.image(images['SGD Classifier']['path'], caption=None, width=650)
+            st.image(images['SGD Classifier']['path'], caption=None, width=1200)
         with st.expander(f"**Random Forest** Score F1-pondéré: {images['Random Forest']['score']}"):
             st.write(f"Détails sur le modèle Random Forest.")
-            st.image(images['Random Forest']['path'], caption=None, width=650)
+            st.image(images['Random Forest']['path'], caption=None, width=1200)
         with st.expander(f"**Voting Classifier 'Soft'** Score F1-pondéré: {images['Voting Classifier Soft']['score']}"):
             st.write(f"Détails sur le modèle Voting Classifier 'Soft'.")
-            st.image(images['Voting Classifier Soft']['path'], caption=None, width=650)
+            st.image(images['Voting Classifier Soft']['path'], caption=None, width=1200)
         with st.expander(f"**Voting Classifier 'Hard'** Score F1-pondéré: {images['Voting Classifier Hard']['score']}"):
             st.write(f"Détails sur le modèle Voting Classifier 'Hard'.")
-            st.image(images['Voting Classifier Hard']['path'], caption=None, width=650)
+            st.image(images['Voting Classifier Hard']['path'], caption=None, width=1200)
         with st.expander(f"**Naive Bayes Gaussien** Score F1-pondéré: {images['Naive Bayes Gaussien']['score']}"):
             st.write(f"Détails sur le modèle Naive Bayes Gaussien.")
-            st.image(images['Naive Bayes Gaussien']['path'], caption=None, width=650)
+            st.image(images['Naive Bayes Gaussien']['path'], caption=None, width=1200)
 
     # Images pour chaque scénario avec scores
     images_scenario_A = {
@@ -386,37 +396,48 @@ elif page == "Machine Learning":
     # Contenu du tab Scénario A
     with tabs[0]:
         st.header("Scénario A")
+        st.write("Vectorisation des images par CNN, vectorisation du texte avec SPACY sans traduction de texte")
+        st.write("")
         st.write("Les modèles:")
         add_model_expanders(images_scenario_A)
 
     # Contenu du tab Scénario B
     with tabs[1]:
         st.header("Scénario B")
+        st.write("Vectorisation des images par CNN, vectorisation du texte avec TF-IDF, après tokenisation, lemmatisation, application des stop-words, sans traduction de texte et une réduction par TruncatedSVD")
+        st.write("")
         st.write("Les modèles:")
         add_model_expanders(images_scenario_B)
 
     # Contenu du tab Scénario E
     with tabs[2]:
         st.header("Scénario E")
+        st.write("Même vectorisation que scénario B avec traduction de texte dans la langue majoritaire, à savoir le français")
+        st.write("")
         st.write("Les modèles:")
         add_model_expanders(images_scenario_E)
 
     # Contenu du tab Amélioration
     with tabs[3]:
         st.header("Amélioration")
+        st.write("Étape 1 : Recherche des Meilleurs Hyperparamètres")
+        st.write("")
         with st.expander("**Amélioration B** Score F1-pondéré: 0.79"):
             st.write("Détails sur Amélioration B.")
-            st.image("ameb.png", caption=None, width=650)
+            st.image("ameb.png", caption=None, width=400)
 
     # Contenu du tab Optimisation
     with tabs[4]:
         st.header("Optimisation")
+        st.write("Étape 2 : Validation Croisée")
+        st.write("Étape 3 : Rééchantillonnage et Évaluation")
+        st.write("")
         with st.expander("**SMOTE** Score F1-pondéré: 0.80"):
             st.write("Détails sur SMOTE.")
-            st.image("SMOTE.png", caption=None, width=650)
+            st.image("SMOTE.png", caption=None, width=400)
         with st.expander("**RandomUnderSampler** Score F1-pondéré: 0.74"):
             st.write("Détails sur RandomUnderSampler.")
-            st.image("RUS.png", caption=None, width=650)
+            st.image("RUS.png", caption=None, width=400)
 
 elif page == "Deep Learning":
     st.markdown("<h1 class='red-title center-title'>Les modèles de Deep Learning étudiés</h1>", unsafe_allow_html=True)
@@ -452,6 +473,8 @@ elif page == "Deep Learning":
 
     with tab2:
         st.header("Les modèles")
+        st.write("**Scénario B**")
+        st.write("Vectorisation des images par CNN, vectorisation du texte avec TF-IDF, après tokenisation, lemmatisation, application des stop-words, sans traduction de texte et une réduction par TruncatedSVD")
 
         with st.expander("**Réseau de neurones denses avec Keras** Score F1-pondéré: 0.77"):
             st.write("""
@@ -767,21 +790,27 @@ elif page == "Deep Learning":
     with tab3:
         st.header("Synthèse des scores de F1-pondéré")
         st.write("""
-        Voici un récapitulatif des scores des modèles étudiés qui ont fonctionnés.
-
-        Le modèle EfficientNetB0-LSTM se distingue comme le meilleur modèle parmi ceux testés, avec une exactitude, une précision, un rappel et un score F1 pondéré les plus élevés (0.96).   
-        Avec ce modèle nous avons dépassé non seulement le score du Benchmark (0.81), mais aussi le meilleur score du « Challenge » (0.92).  
-        A noté que le modèle DistilBERT atteint lui aussi le niveau du meilleur score, sans le dépasser.  
-        Si l’on analyse séparément les scores texte et image, l’on constate que le modèle LSTM a probablement contribué à atteindre ce score.  
-        Mais ce résultat, provient aussi de l’étape de pré-processing effectuée sur le texte en filtrant un maximum d’anomalies et en préparant le texte à la modélisation.  
-
-        En revanche, le modèle ResNet50-LSTM affiche les performances les plus faibles, notamment avec un score F1 pondéré (0.74), ce qui est significativement inférieur aux autres modèles.   
-        Ces résultats suggèrent que les modèles basés sur des réseaux de neurones convolutifs sont particulièrement efficaces pour cette tâche de classification, tandis que les DNN pourraient nécessiter des améliorations ou ne pas être aussi bien adaptés à ce type spécifique de données ou de problème.
-
-        **Nous avons donc choisi le modèle EfficientNetB0-LSTM pour passer à l'étape de prédictions de nos données.**  
-        """)
+                Voici un récapitulatif des scores des modèles étudiés qui ont fonctionnés.  
+                """)
         
-        st.image("score_deep.png", caption="Synthèse des scores de F1-pondéré")   
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("""
+                    Le modèle EfficientNetB0-LSTM se distingue comme le meilleur modèle parmi ceux testés, avec une exactitude, une précision, un rappel et un score F1 pondéré les plus élevés (0.96).   
+                    Avec ce modèle nous avons dépassé non seulement le score du Benchmark (0.81), mais aussi le meilleur score du « Challenge » (0.92).  
+                    A noté que le modèle DistilBERT atteint lui aussi le niveau du meilleur score, sans le dépasser.  
+                    Si l’on analyse séparément les scores texte et image, l’on constate que le modèle LSTM a probablement contribué à atteindre ce score.  
+                    Mais ce résultat, provient aussi de l’étape de pré-processing effectuée sur le texte en filtrant un maximum d’anomalies et en préparant le texte à la modélisation.  
+
+                    En revanche, le modèle ResNet50-LSTM affiche les performances les plus faibles, notamment avec un score F1 pondéré (0.74), ce qui est significativement inférieur aux autres modèles.   
+                    Ces résultats suggèrent que les modèles basés sur des réseaux de neurones convolutifs sont particulièrement efficaces pour cette tâche de classification, tandis que les DNN pourraient nécessiter des améliorations ou ne pas être aussi bien adaptés à ce type spécifique de données ou de problème.
+
+                    **Nous avons donc choisi le modèle EfficientNetB0-LSTM pour passer à l'étape de prédictions de nos données.**  
+                    """)
+            
+        with col2:       
+            st.image("score_deep.png", caption="Synthèse des scores de F1-pondéré")   
 
     with tab4:
         st.header("Interprétation du texte et des images par le Modèle EfficientNetB0-LSTM")
@@ -814,8 +843,14 @@ elif page == "Deep Learning":
             
              Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :  
             """)
-            st.image("txt_inter_2.png", caption="Visualisation des états cachés - États cachés", width=400)
-            st.image("txt_inter_3.png", caption="Visualisation des états cachés - Sorties LSTM", width=400)
+            
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.image("txt_inter_2.png", caption="Visualisation des états cachés - États cachés", width=400)
+                
+            with col2:
+                st.image("txt_inter_3.png", caption="Visualisation des états cachés - Sorties LSTM", width=400)
             
             st.write("""
             **Remarques:**  
@@ -958,10 +993,10 @@ elif page == "Conclusion":
 elif page == "Démo":
     st.markdown("<h1 class='red-title center-title'>Classification de produit</h1>", unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Jeu de données Rakuten", "Autres données"])
+    tab1, tab2 = st.tabs(['Jeu de données "Test" Rakuten', "Autres données"])
 
     with tab1:
-        st.header("Jeu de données Rakuten")
+        st.header('Jeu de données "Test" Rakuten')
 
         # Code spécifique au tab "Jeu de données Rakuten"
         st.write("""
@@ -969,7 +1004,7 @@ elif page == "Démo":
         """)
 
         # Charger et afficher les 20 premières lignes du dataframe
-        df_prediction_final = load_data("df_prediction_final.csv")
+        df_prediction_final = load_data_from_s3(AWS_BUCKET_NAME, "df_prediction_final.csv")
         
         st.data_editor(
             df_prediction_final.head(20),
@@ -1148,4 +1183,3 @@ st.sidebar.markdown(f"""
 </a>
 """, unsafe_allow_html=True)
 st.sidebar.text("Datascientist - Bootcamp mars 2024")
-
