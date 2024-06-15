@@ -1108,3 +1108,4 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
+
