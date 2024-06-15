@@ -11,10 +11,10 @@ import os
 import boto3
 from io import BytesIO
 from PIL import Image
-from tensorflow.keras.preprocessing.sequence import pad_sequences # type: ignore
-from tensorflow.keras.preprocessing.image import load_img, img_to_array # type: ignore
-from tensorflow.keras.models import load_model # type: ignore
-from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from streamlit_elements import elements, mui
@@ -123,10 +123,10 @@ def predict_and_evaluate(_model, loader, device):
 
     return np.array(predictions), np.array(true_labels), avg_val_accuracy, avg_val_loss
 
-# Définir la configuration de la page pour utiliser toute la largeur de l'écran
+# Define page configuration to use the full width of the screen
 st.set_page_config(layout="wide")
 
-# Définir le CSS directement dans le script
+# Define CSS directly in the script
 css = """
 <style>
 body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMarkdown, .stSidebar, .stTitle, .stHeader, .stRadio {
@@ -136,12 +136,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
     font-family: 'Arial', sans-serif;
 }
 .small-title {
-    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
+    font-size: 14px;  /* Adjust this value as needed */
     font-weight: bold;
 }
 .reduced-spacing p {
-    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
-    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
+    margin-bottom: 5px;  /* Adjust this value as needed */
+    margin-top: 5px;     /* Adjust this value as needed */
 }
 .red-title {
     color: #BF0000;
@@ -155,10 +155,10 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 </style>
 """
 
-# Injecter le CSS dans l'application Streamlit
+# Inject CSS into the Streamlit app
 st.markdown(css, unsafe_allow_html=True)
 
-# Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
+# Add Rakuten logo to the sidebar with a hyperlink
 st.sidebar.markdown(f"""
 <a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
     <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' style="width: 100%;">
@@ -1183,3 +1183,4 @@ st.sidebar.markdown(f"""
 </a>
 """, unsafe_allow_html=True)
 st.sidebar.text("Datascientist - Bootcamp mars 2024")
+
