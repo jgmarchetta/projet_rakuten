@@ -18,6 +18,15 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from streamlit_elements import elements, mui
+from botocore.exceptions import ClientError
+
+def load_data_from_s3(bucket_name, file_key):
+    try:
+        obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+        return pd.read_csv(BytesIO(obj['Body'].read()))
+    except ClientError as e:
+        st.error(f"Erreur lors de la récupération de l'objet S3 : {e}")
+        raise e
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = st.secrets["AWS"]["AWS_ACCESS_KEY_ID"]
@@ -30,10 +39,6 @@ s3_client = boto3.client(
     aws_access_key_id=AWS_ACCESS_KEY_ID,
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
-
-def load_data_from_s3(bucket_name, file_key):
-    obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
-    return pd.read_csv(BytesIO(obj['Body'].read()))
 
 @st.cache_data
 def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
