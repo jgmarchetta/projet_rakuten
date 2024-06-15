@@ -20,14 +20,6 @@ from torch.utils.data import DataLoader, Dataset
 from streamlit_elements import elements, mui
 from botocore.exceptions import ClientError
 
-def load_data_from_s3(bucket_name, file_key):
-    try:
-        obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
-        return pd.read_csv(BytesIO(obj['Body'].read()))
-    except ClientError as e:
-        st.error(f"Erreur lors de la récupération de l'objet S3 : {e}")
-        raise e
-
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = st.secrets["AWS"]["AWS_ACCESS_KEY_ID"]
 AWS_SECRET_ACCESS_KEY = st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"]
@@ -40,12 +32,30 @@ s3_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
 
+def load_data_from_s3(bucket_name, file_key):
+    try:
+        obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+        return pd.read_csv(BytesIO(obj['Body'].read()))
+    except ClientError as e:
+        st.error(f"Erreur lors de la récupération de l'objet S3 : {e}")
+        raise e
+
+def load_model_from_s3(bucket_name, model_key):
+    try:
+        obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
+        with open('/tmp/temp_model.keras', 'wb') as f:
+            f.write(obj['Body'].read())
+        model = load_model('/tmp/temp_model.keras')
+        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+        return model
+    except ClientError as e:
+        st.error(f"Erreur lors de la récupération du modèle S3 : {e}")
+        raise e
+
 @st.cache_data
 def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
-    model_obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
-    model = load_model(BytesIO(model_obj['Body'].read()))
-    model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
-    
+    model = load_model_from_s3(bucket_name, model_key)
+
     tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
     tokenizer = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
     
@@ -1113,4 +1123,5 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
+
 
