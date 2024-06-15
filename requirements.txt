@@ -13,3 +13,4 @@ streamlit_elements
 scipy
 requests
 Pillow
+boto3
