@@ -20,9 +20,9 @@ from torch.utils.data import DataLoader, Dataset
 from streamlit_elements import elements, mui
 
 # AWS S3 Configuration
-AWS_ACCESS_KEY_ID = st.secrets["AWS_ACCESS_KEY_ID"]
-AWS_SECRET_ACCESS_KEY = st.secrets["AWS_SECRET_ACCESS_KEY"]
-AWS_BUCKET_NAME = st.secrets["AWS_BUCKET_NAME"]
+AWS_ACCESS_KEY_ID = st.secrets["AWS"]["AWS_ACCESS_KEY_ID"]
+AWS_SECRET_ACCESS_KEY = st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"]
+AWS_BUCKET_NAME = st.secrets["AWS"]["AWS_BUCKET_NAME"]
 
 # Initialize Boto3 S3 client
 s3_client = boto3.client(
@@ -48,80 +48,6 @@ def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_k
     le = pickle.load(BytesIO(le_obj['Body'].read()))
     
     return model, tokenizer, le
-
-@st.cache_data
-def preprocess_data(df, _label_encoder):
-    df.loc[:, "prdtypecode"] = _label_encoder.fit_transform(df["prdtypecode"])
-    train_texts, val_texts, train_labels, val_labels = train_test_split(df["token_text"], df["prdtypecode"], test_size=0.2, random_state=42)
-    return train_texts, val_texts, train_labels, val_labels
-
-def tokenize_texts(_tokenizer, texts, max_len=128):
-    encodings = _tokenizer(list(texts), truncation=True, padding=True, return_tensors="pt", max_length=max_len)
-    return encodings
-
-def prepare_datasets(texts, _labels, _tokenizer, max_len=128):
-    class CustomDataset(Dataset):
-        def __init__(self, texts, labels, tokenizer, max_len):
-            self.texts = texts
-            self.labels = labels
-            self.tokenizer = tokenizer
-            self.max_len = max_len
-
-        def __len__(self):
-            return len(self.texts)
-
-        def __getitem__(self, idx):
-            text = self.texts[idx]
-            label = self.labels[idx]
-            encoding = self.tokenizer.encode_plus(
-                text,
-                add_special_tokens=True,
-                max_length=self.max_len,
-                return_token_type_ids=False,
-                padding="max_length",
-                truncation=True,
-                return_attention_mask=True,
-                return_tensors="pt",
-            )
-            return {
-                "input_ids": encoding["input_ids"].flatten(),
-                "attention_mask": encoding["attention_mask"].flatten(),
-                "labels": torch.tensor(label, dtype=torch.long)
-            }
-
-    dataset = CustomDataset(texts=texts.tolist(), labels=_labels.tolist(), tokenizer=_tokenizer, max_len=max_len)
-    return dataset
-
-def predict_and_evaluate(_model, loader, device):
-    _model.eval()
-    predictions = []
-    true_labels = []
-    total_eval_accuracy = 0
-    total_eval_loss = 0
-    nb_eval_steps = 0
-
-    for batch in loader:
-        input_ids, attention_mask, labels = batch["input_ids"].to(device), batch["attention_mask"].to(device), batch["labels"].to(device)
-
-        with torch.no_grad():
-            outputs = _model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-
-        loss = outputs.loss
-        logits = outputs.logits
-
-        total_eval_loss += loss.item()
-        preds = torch.argmax(logits, dim=1).flatten()
-        accuracy = accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
-        total_eval_accuracy += accuracy
-        nb_eval_steps += 1
-
-        predictions.extend(preds.cpu().numpy())
-        true_labels.extend(labels.cpu().numpy())
-
-    avg_val_accuracy = total_eval_accuracy / nb_eval_steps
-    avg_val_loss = total_eval_loss / nb_eval_steps
-
-    return np.array(predictions), np.array(true_labels), avg_val_accuracy, avg_val_loss
 
 # Define page configuration to use the full width of the screen
 st.set_page_config(layout="wide")
@@ -1182,5 +1108,3 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
-st.sidebar.text("Datascientist - Bootcamp mars 2024")
-
