@@ -8,89 +8,26 @@ import tensorflow as tf
 import torch
 import plotly.graph_objs as go
 import os
-import boto3
+import gdown
 
-from io import BytesIO
 from PIL import Image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Sequential, load_model, Model
+from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
 from streamlit_elements import elements, mui
-from botocore.exceptions import ClientError
 
-# AWS S3 Configuration
-AWS_ACCESS_KEY_ID = st.secrets["AWS"]["AWS_ACCESS_KEY_ID"]
-AWS_SECRET_ACCESS_KEY = st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"]
-AWS_BUCKET_NAME = st.secrets["AWS"]["AWS_BUCKET_NAME"]
-
-# Initialize Boto3 S3 client
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-)
-
-def load_data_from_s3(bucket_name, file_key):
-    try:
-        obj = s3_client.get_object(Bucket=bucket_name, Key=file_key)
-        return pd.read_csv(BytesIO(obj['Body'].read()))
-    except ClientError as e:
-        st.error(f"Erreur lors de la récupération de l'objet S3 : {e}")
-        raise e
-
-@st.cache_data
-def load_model_and_tokenizer_from_s3(bucket_name, model_key, tokenizer_key, le_key):
-    try:
-        model_obj = s3_client.get_object(Bucket=bucket_name, Key=model_key)
-        model_file = BytesIO(model_obj['Body'].read())
-        
-        # Vérifier le format du fichier modèle et le convertir si nécessaire
-        try:
-            model = load_model(model_file)
-        except Exception as e:
-            st.warning(f"Le fichier n'est pas au format .keras v3 ou .h5 : {e}")
-            model = convert_and_load_model(model_file)
-
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
-        
-        tokenizer_obj = s3_client.get_object(Bucket=bucket_name, Key=tokenizer_key)
-        tokenizer = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
-        
-        le_obj = s3_client.get_object(Bucket=bucket_name, Key=le_key)
-        le = pickle.load(BytesIO(le_obj['Body'].read()))
-        
-        return model, tokenizer, le
-    except ClientError as e:
-        st.error(f"Erreur lors du chargement des ressources S3 : {e}")
-        raise e
-
-def convert_and_load_model(model_file):
-    try:
-        # Sauvegarder temporairement le fichier téléchargé
-        with open("temp_model_file", "wb") as f:
-            f.write(model_file.getbuffer())
-
-        # Convertir et charger le modèle
-        temp_h5_model_path = "temp_model_file.h5"
-        model = tf.keras.models.load_model("temp_model_file")
-        model.save(temp_h5_model_path, save_format='h5')
-        
-        # Charger le modèle converti
-        model = tf.keras.models.load_model(temp_h5_model_path)
-        os.remove("temp_model_file")
-        os.remove(temp_h5_model_path)
-        return model
-    except Exception as e:
-        st.error(f"Erreur lors de la conversion du modèle : {e}")
-        return None
-
-# Define page configuration to use the full width of the screen
+# Définir la configuration de la page pour utiliser toute la largeur de l'écran
 st.set_page_config(layout="wide")
 
-# Define CSS directly in the script
+# Définir le CSS directement dans le script
 css = """
 <style>
 body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMarkdown, .stSidebar, .stTitle, .stHeader, .stRadio {
@@ -100,12 +37,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
     font-family: 'Arial', sans-serif;
 }
 .small-title {
-    font-size: 14px;  /* Adjust this value as needed */
+    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
     font-weight: bold;
 }
 .reduced-spacing p {
-    margin-bottom: 5px;  /* Adjust this value as needed */
-    margin-top: 5px;     /* Adjust this value as needed */
+    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
+    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
 }
 .red-title {
     color: #BF0000;
@@ -119,10 +56,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 </style>
 """
 
-# Inject CSS into the Streamlit app
+# Injecter le CSS dans l'application Streamlit
 st.markdown(css, unsafe_allow_html=True)
 
-# Add Rakuten logo to the sidebar with a hyperlink
+# st.sidebar.title("PROJET")
+
+# Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
 <a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
     <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' style="width: 100%;">
@@ -132,6 +71,102 @@ st.sidebar.markdown(f"""
 st.sidebar.title("Sommaire")
 pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "Deep Learning", "Conclusion", "Démo"]
 page = st.sidebar.radio("Aller vers:", pages)
+
+@st.cache_data
+def load_data(csv_path):
+    if not os.path.exists(csv_path):
+        url = "https://1drv.ms/u/s!As8Ya4n-7uIMhtIBuxFHFX2wL9pbsg?e=zrrvzj"
+        gdown.download(url, csv_path, quiet=False)
+    return pd.read_csv(csv_path)
+
+@st.cache_data
+def load_model_and_tokenizer(model_url, tokenizer_path, le_path):
+    # Télécharger le modèle depuis Google Drive
+    model_path = "model_EfficientNetB0-LSTM.keras"
+    if not os.path.exists(model_path):
+        gdown.download(model_url, model_path, quiet=False)
+    
+    model = load_model(model_path)
+    model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+    with open(tokenizer_path, 'rb') as handle:
+        tokenizer = pickle.load(handle)
+    with open(le_path, 'rb') as handle:
+        le = pickle.load(handle)
+    return model, tokenizer, le
+
+@st.cache_data
+def preprocess_data(df, _label_encoder):
+    df.loc[:, "prdtypecode"] = _label_encoder.fit_transform(df["prdtypecode"])
+    train_texts, val_texts, train_labels, val_labels = train_test_split(df["token_text"], df["prdtypecode"], test_size=0.2, random_state=42)
+    return train_texts, val_texts, train_labels, val_labels
+
+def tokenize_texts(_tokenizer, texts, max_len=128):
+    encodings = _tokenizer(list(texts), truncation=True, padding=True, return_tensors="pt", max_length=max_len)
+    return encodings
+
+def prepare_datasets(texts, _labels, _tokenizer, max_len=128):
+    class CustomDataset(Dataset):
+        def __init__(self, texts, labels, tokenizer, max_len):
+            self.texts = texts
+            self.labels = labels
+            self.tokenizer = tokenizer
+            self.max_len = max_len
+
+        def __len__(self):
+            return len(self.texts)
+
+        def __getitem__(self, idx):
+            text = self.texts[idx]
+            label = self.labels[idx]
+            encoding = self.tokenizer.encode_plus(
+                text,
+                add_special_tokens=True,
+                max_length=self.max_len,
+                return_token_type_ids=False,
+                padding="max_length",
+                truncation=True,
+                return_attention_mask=True,
+                return_tensors="pt",
+            )
+            return {
+                "input_ids": encoding["input_ids"].flatten(),
+                "attention_mask": encoding["attention_mask"].flatten(),
+                "labels": torch.tensor(label, dtype=torch.long)
+            }
+
+    dataset = CustomDataset(texts=texts.tolist(), labels=_labels.tolist(), tokenizer=_tokenizer, max_len=max_len)
+    return dataset
+
+def predict_and_evaluate(_model, loader, device):
+    _model.eval()
+    predictions = []
+    true_labels = []
+    total_eval_accuracy = 0
+    total_eval_loss = 0
+    nb_eval_steps = 0
+
+    for batch in loader:
+        input_ids, attention_mask, labels = batch["input_ids"].to(device), batch["attention_mask"].to(device), batch["labels"].to(device)
+
+        with torch.no_grad():
+            outputs = _model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+
+        loss = outputs.loss
+        logits = outputs.logits
+
+        total_eval_loss += loss.item()
+        preds = torch.argmax(logits, dim=1).flatten()
+        accuracy = accuracy_score(labels.cpu().numpy(), preds.cpu().numpy())
+        total_eval_accuracy += accuracy
+        nb_eval_steps += 1
+
+        predictions.extend(preds.cpu().numpy())
+        true_labels.extend(labels.cpu().numpy())
+
+    avg_val_accuracy = total_eval_accuracy / nb_eval_steps
+    avg_val_loss = total_eval_loss / nb_eval_steps
+
+    return np.array(predictions), np.array(true_labels), avg_val_accuracy, avg_val_loss
 
 # Présentation du projet
 if page == "Présentation":
@@ -178,9 +213,9 @@ if page == "Données":
     selected_dataset = st.selectbox("**Sélectionnez le jeu de données :**", ["X_train", "X_test", "Y_train", "Fichier Images Train"])
 
     # Charger les données
-    df_train = load_data_from_s3(AWS_BUCKET_NAME, 'X_train_update.csv')
-    df_test = load_data_from_s3(AWS_BUCKET_NAME, 'X_test_update.csv')
-    df_target = load_data_from_s3(AWS_BUCKET_NAME, 'Y_train_CVw08PX.csv')
+    df_train = load_data('X_train_update.csv')
+    df_test = load_data('X_test_update.csv')
+    df_target = load_data('Y_train_CVw08PX.csv')
 
     # Fonctions pour afficher des graphiques
     def plot_missing_values_heatmap(df):
@@ -968,7 +1003,7 @@ elif page == "Démo":
         """)
 
         # Charger et afficher les 20 premières lignes du dataframe
-        df_prediction_final = load_data_from_s3(AWS_BUCKET_NAME, "df_prediction_final.csv")
+        df_prediction_final = load_data("df_prediction_final.csv")
         
         st.data_editor(
             df_prediction_final.head(20),
@@ -996,15 +1031,19 @@ elif page == "Démo":
             # Charger les ressources pour la démo
             def load_demo_resources():
                 try:
-                    tokenizer_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='tokenizer.pkl')
-                    le_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='label_encoder.pkl')
-                    model_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='model_EfficientNetB0-LSTM.keras')
-                    categories_csv_obj = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key='categories_prdtypecode.csv')
+                    tokenizer_path_d = "tokenizer.pkl"
+                    le_path_d = "label_encoder.pkl"
+                    model_path_d = "model_EfficientNetB0-LSTM.keras"
+                    categories_csv_path_d = "categories_prdtypecode.csv"
 
-                    tokenizer_demo = pickle.load(BytesIO(tokenizer_obj['Body'].read()))
-                    le_demo = pickle.load(BytesIO(le_obj['Body'].read()))
-                    model_demo = load_model(BytesIO(model_obj['Body'].read()))
-                    categorie_demo = pd.read_csv(BytesIO(categories_csv_obj['Body'].read()), sep=';')
+                    with open(tokenizer_path_d, 'rb') as handle:
+                        tokenizer_demo = pickle.load(handle)
+
+                    with open(le_path_d, 'rb') as handle:
+                        le_demo = pickle.load(handle)
+
+                    model_demo = tf.keras.models.load_model(model_path_d)
+                    categorie_demo = pd.read_csv(categories_csv_path_d, sep=';')
 
                     return tokenizer_demo, le_demo, model_demo, categorie_demo
 
@@ -1103,7 +1142,7 @@ elif page == "Démo":
                     """)
             
             # Charger et afficher le dataframe catégories
-            df_categorie = pd.read_csv(BytesIO(categories_csv_obj['Body'].read()), sep=';')
+            df_categorie = pd.read_csv("categories_prdtypecode.csv", sep=';')
             
             st.data_editor(
                 df_categorie,
@@ -1142,3 +1181,4 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
+st.sidebar.text("Datascientist - Bootcamp mars 2024")
