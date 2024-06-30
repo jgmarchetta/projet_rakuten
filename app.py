@@ -13,15 +13,12 @@ import gdown
 from PIL import Image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import Sequential, load_model, Model
-from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
+from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from torch.utils.data import DataLoader, Dataset
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
 from streamlit_elements import elements, mui
 
 # Définir la configuration de la page pour utiliser toute la largeur de l'écran
@@ -58,8 +55,6 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 
 # Injecter le CSS dans l'application Streamlit
 st.markdown(css, unsafe_allow_html=True)
-
-# st.sidebar.title("PROJET")
 
 # Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
