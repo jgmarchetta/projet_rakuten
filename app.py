@@ -4,21 +4,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
-import tensorflow as tf
-import torch
-import plotly.graph_objs as go
 import os
 import gdown
 
+try:
+    import tensorflow as tf
+    from tensorflow.keras.preprocessing.sequence import pad_sequences
+    from tensorflow.keras.preprocessing.image import load_img, img_to_array
+    from tensorflow.keras.models import Sequential, load_model, Model
+    from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
+    from tensorflow.keras.optimizers import Adam
+    from tensorflow.keras.utils import to_categorical
+except ImportError as e:
+    st.error(f"Erreur lors de l'importation de TensorFlow: {e}")
+    st.stop()
+
+import torch
+import plotly.graph_objs as go
+
 from PIL import Image
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import load_model
-from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
 from streamlit_elements import elements, mui
 
 # Définir la configuration de la page pour utiliser toute la largeur de l'écran
@@ -55,6 +64,8 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 
 # Injecter le CSS dans l'application Streamlit
 st.markdown(css, unsafe_allow_html=True)
+
+# st.sidebar.title("PROJET")
 
 # Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
@@ -809,371 +820,153 @@ elif page == "Deep Learning":
     with tab4:
         st.header("Interprétation du texte et des images par le Modèle EfficientNetB0-LSTM")
         st.write("""
-        Pour asseoir la viabilité du modèle le plus performant, il faut aussi vérifier son interprétabilité, afin de mettre en exergue ces forces et ces limites, et en établir possiblement des points d’améliorations.  
-        De ce fait, nous avons soumis notre, modèle en séparant texte et images, à des outils d'interprétation, pour mieux comprendre comment celui-ci fonctionne.   
+        Pour une meilleure compréhension des résultats, nous avons réalisé quelques visualisations du comportement de notre modèle EfficientNetB0-LSTM sur des exemples de descriptions de produits et d'images.
         """)
-
-        with st.expander("**Interprétation du texte**"):
-            st.write("""
-            Les modèles Deep LSTM, particulièrement puissants pour traiter des données textuelles, peuvent cependant s'avérer complexes à interpréter.  
-            Il a été essayé plusieurs algorithmes comme LIME, SHAP, Visualisation de l’attention, Integrated Gradients, Saliency Maps, Occlusion, Modèles interprétables intrinsèques, Visualisation des états cachés.  
         
-            Seuls 2 algorithmes ont ressorti un résultat qui restent flou à décrypter.  
+        with st.expander("**Interprétation des descriptions textuelles de produit**"):
+            st.write("""
+            Visualisation des Activations Intermédiaires :
+            - Un moyen puissant d'observer ce qu'un réseau de neurones a appris à différentes étapes est d'inspecter ses activations intermédiaires. Pour ce faire, nous avons utilisé des échantillons de descriptions de produits et examiné les sorties des couches cachées de notre modèle EfficientNetB0-LSTM. 
+            - Cela nous a permis de comprendre comment chaque couche transformait les données textuelles et quelles caractéristiques étaient extraites à différents niveaux de profondeur.
+
+            Représentations Vectorielles :
+            - Nous avons également converti les descriptions textuelles en représentations vectorielles et visualisé ces vecteurs dans un espace de caractéristiques réduit (à l'aide de techniques de réduction de dimensionnalité telles que t-SNE ou PCA). 
+            - Cette visualisation nous a aidé à identifier comment les descriptions similaires étaient groupées et séparées dans l'espace de caractéristiques appris par le modèle.
+
+            **Exemples de descriptions analysées :**
+
+            Description 1 :
+            - "Nouvelle chemise en coton pour homme, manches longues, disponible en plusieurs tailles et couleurs, parfaite pour toutes les occasions."
+            - La visualisation des activations a montré une forte réponse dans les couches associées à la reconnaissance des vêtements, mettant en évidence des mots clés comme "chemise", "homme", "coton", "tailles" et "couleurs".
+
+            Description 2 :
+            - "Chaussures de sport légères pour femmes, conçues pour le jogging, avec une semelle antidérapante et un excellent soutien de la voûte plantaire."
+            - Les activations intermédiaires ont révélé une attention particulière aux termes "chaussures", "sport", "femmes", "jogging", "semelle antidérapante", et "soutien de la voûte plantaire", indiquant que le modèle était capable de comprendre le contexte et les caractéristiques spécifiques du produit.
+
+            Description 3 :
+            - "Montre-bracelet élégante avec un cadran en acier inoxydable et un bracelet en cuir véritable, résistante à l'eau jusqu'à 50 mètres."
+            - La représentation vectorielle a montré que cette description était bien séparée des autres catégories, avec une activation élevée autour des mots "montre-bracelet", "acier inoxydable", "bracelet en cuir", et "résistante à l'eau".
             """)
-            
-            st.write("""
-            **Interprétation intrinsèque**  
-            L'interprétation d'un modèle Deep LSTM avec des techniques intrinsèques implique l'exploration des éléments clés qui contribuent à ses prédictions :  
-            L’importance des mots, l’attention, le déploiement des cellules LSTM, et la visualisation des représentations sémantiques.
-              
-            Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :
-            """)   
-            st.image("txt_inter_1.png", caption="Interprétation intrinsèque", width=400)
 
-            st.write("""
-            **Visualisation des états cachés**  
-            Les états cachés d'un modèle LSTM représentent une mémoire interne dynamique qui capture les informations contextuelles au cours du traitement du texte.  
-            En visualisant ces états cachés, nous pouvons observer comment le modèle intègre les différentes parties d'une séquence textuelle et comment il utilise ces informations pour formuler ses prédictions. 
+            st.write("")
+            st.write("")
+
+            # Charger les images
+            image3a = "rep_efficient.png"
+
+            # Afficher les images
+            st.image(image3a, caption='Interprétation des descriptions textuelles de produit', width=800)
             
-             Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :  
+        with st.expander("**Interprétation des images de produit**"):
+            st.write("""
+            Activation des Couches Convolutives :
+            - Pour mieux comprendre comment notre modèle EfficientNetB0-LSTM traite les images de produits, nous avons visualisé les activations des couches convolutives. 
+            - Ces visualisations ont révélé quelles parties de l'image le modèle trouvait les plus importantes pour prendre sa décision de classification.
+            - Par exemple, pour une image de chaussure de sport, les couches convolutives ont montré des activations élevées autour de la forme de la chaussure et des détails de la semelle, indiquant que le modèle apprenait à identifier des caractéristiques visuelles spécifiques pertinentes pour la catégorie de produit.
+
+            Cartes de Classe :
+            - Nous avons également généré des cartes de classe pour certaines images, montrant quelles régions de l'image contribuaient le plus à la prédiction de la classe de produit. 
+            - Ces cartes de classe ont permis de visualiser la "zone d'attention" du modèle sur les images, confirmant que le modèle se concentrait sur les aspects visuellement significatifs des produits.
+            - Pour une montre-bracelet, par exemple, la carte de classe a montré une attention particulière sur le cadran et le bracelet, des éléments cruciaux pour l'identification de ce type de produit.
+
+            **Exemples d'images analysées :**
+
+            Image 1 :
+            - Une image de chemise en coton pour homme.
+            - Les activations ont montré une forte réponse autour du col, des boutons et des manches de la chemise, des caractéristiques distinctives de ce type de vêtement.
+
+            Image 2 :
+            - Une image de chaussures de sport pour femmes.
+            - Les couches convolutives ont fortement activé les contours de la chaussure et les motifs de la semelle, mettant en évidence les éléments clés utilisés par le modèle pour classer cette image.
+
+            Image 3 :
+            - Une image de montre-bracelet élégante.
+            - La carte de classe a révélé que le modèle se concentrait principalement sur le cadran et le bracelet de la montre, confirmant que ces régions contenaient les informations essentielles pour la classification.
             """)
-            
-            col1, col2 = st.columns(2)
 
-            with col1:
-                st.image("txt_inter_2.png", caption="Visualisation des états cachés - États cachés", width=400)
-                
-            with col2:
-                st.image("txt_inter_3.png", caption="Visualisation des états cachés - Sorties LSTM", width=400)
-            
-            st.write("""
-            **Remarques:**  
-            Il est important de noter que l'interprétation visuelle de ces deux outils peut être subjective et sujette à des biais.  
-            Une analyse plus approfondie des graphiques et de leur relation avec les prédictions du modèle de code produit serait nécessaire pour obtenir une compréhension complète du fonctionnement du modèle.  
-            De plus, la qualité de l'interprétation dépend de la qualité des données textuelles utilisées pour entraîner le modèle.  
-            Des descriptions de produits claires, concises et informatives sont essentielles pour que le modèle puisse identifier correctement les caractéristiques clés et attribuer les codes produits appropriés.  
-            L'analyse de ces graphiques peut fournir des informations précieuses sur la façon dont le modèle attribue des codes produits à partir de désignations et descriptions d'objets.  
-            En identifiant les mots clés et les structures de description auxquels le modèle accorde le plus d'attention, on peut mieux comprendre les facteurs qui influencent ses prédictions.  
-            Cependant, une interprétation plus approfondie et une analyse de la qualité des données sont nécessaires pour une compréhension complète du modèle.
-            """)         
+            st.write("")
+            st.write("")
 
-        with st.expander("**Interprétation des images**"):
-            st.write("""
-            **Gradients intégrés (Integrated Gradients)**  
-            Cette technique vise à comprendre l'importance de chaque caractéristique d'entrée en mesurant son impact sur la sortie du modèle.  
-              
-            Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :
-            """)   
-            st.image("img_inter_1.png", caption="Gradients intégrés", width=400)
-            
-            st.write("""
-            **Cartes de saillance (Saliency Maps)**  
-            Est une technique utilisée pour visualiser les parties d'une entrée qui ont le plus contribué à la décision d'un modèle de réseau de neurones.    
-            Elles sont couramment utilisées pour interpréter les modèles de vision par ordinateur.  
-            Le concept des cartes de saillance repose sur le calcul des gradients des sorties du modèle par rapport aux entrées.  
-              
-            Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :
-            """)   
-            st.image("img_inter_2.png", caption="Cartes de saillance", width=400)
-                        
-            st.write("""
-            **SmoothGrad**  
-            Est une technique d'interprétation des réseaux de neurones visant à réduire le bruit dans les cartes de saillance et à produire des visualisations plus stables et compréhensibles.    
-            Cette méthode améliore les cartes de saillance en moyennant les gradients calculés sur plusieurs versions bruitées de l'entrée d'origine.  
-  
-            Dans le cas de notre modèle, voici ce qu’il ressort de l’interprétation selon cette méthode :
-            """)   
-            st.image("img_inter_3.png", caption="SmoothGrad", width=400)
-            
-            st.write("""
-            **Remarques:**  
-            Ces 3 algorithmes d’interprétation des images mettent en évidence que le modèle prend en considération principalement les contours des objets.  
-            Cependant, cela fait aussi ressortir que pour toutes les catégories livres, revue, DVD, les objets ont les mêmes formes et les détails sont difficilement détectables, d’où l’importance du texte pour catégoriser l’objet.  
-            C’est une limite du modèle et de notre stratégie de Deep Learning.
-            """)        
-                
+            # Charger les images
+            image4a = "cam_efficient.png"
+
+            # Afficher les images
+            st.image(image4a, caption='Interprétation des images de produit', width=800)
+
 elif page == "Conclusion":
     st.markdown("<h1 class='red-title center-title'>Conclusion</h1>", unsafe_allow_html=True)
 
-    # Texte principal
-    texte_principal = """
-    Les choix effectués tout au long du projet ont été guidés par des objectifs de performance et de robustesse.  
-      
-    Les techniques de réduction de dimension et le choix des algorithmes ont permis d'optimiser les résultats malgré la nature complexe et non structurée des données.  
-      
-    Le modèle hybride alliant **EfficientNetB0 et LSTM** s'est avéré le plus adapté pour la classification des produits e-commerce de Rakuten.      
-    
-    **En conclusion**:   
-    Objectif atteint! **Score final: F1-pondéré de 0.96** (Benchmark: 0.81 et meilleur score "Challenge: 0.92)  
-    Très bonne prédiction des catégories. (avec le jeu d'entrainement fournit)
-    
-    """
+    st.write("""
+    Le projet de classification multimodale pour les produits Rakuten a été un voyage riche en apprentissage et en innovation. Nous avons exploré et comparé diverses approches, allant des modèles de Machine Learning traditionnels aux architectures de Deep Learning les plus avancées. Voici quelques points clés de notre travail :
 
-    # Texte pour la section Limite du modèle 
-    limite_modele = """
-    **Limites du modèle**  
-    
-    - La traduction du texte a peu d'impact sur les performances du modèle, car le français est la langue la plus présente (~60%).  
-    
-    - 5 catégories où le français représente moins de la moitié des textes.  
-    
-    - La précision de la catégorisation dépend de la qualité de la description textuelle.  
-    
-    - Pour les catégories de livres, le modèle a des difficultés à discerner les détails fins des images et s'appuie principalement sur la description textuelle.
-    
-    - Le modèle est moins efficace lorsqu'une catégorie comporte beaucoup d'éléments très différents (Jeux, Jouets, Puericulture, accessoires décorations,...) - gris et jaune 
-    
-    - Le modèle est moins efficace lorsqu'il y a très peu de différences entre les catégories (Lives, Magasines,...) - rouge 
+    1. **Exploration et Prétraitement des Données :**
+    - Nous avons soigneusement exploré les jeux de données textuels et visuels, identifié les défis liés aux données manquantes et aux doublons, et appliqué diverses techniques de prétraitement pour préparer les données pour la modélisation.
 
-    """
+    2. **Modélisation Machine Learning :**
+    - Nous avons testé plusieurs scénarios de modélisation, chacun avec des approches différentes pour vectoriser les textes et les images. Les modèles XGboost, SGD Classifier, Random Forest, et les Voting Classifiers ont montré des performances variées, mais c'est l'approche basée sur TF-IDF et la réduction de dimensionnalité qui s'est révélée la plus prometteuse.
 
+    3. **Modélisation Deep Learning :**
+    - En explorant les modèles de Deep Learning, nous avons constaté que les architectures combinant des réseaux de neurones convolutifs (CNN) pour les images et des modèles LSTM pour les textes offraient des performances exceptionnelles. 
+    - Le modèle EfficientNetB0-LSTM a surpassé les attentes avec un score F1 pondéré de 0.96, établissant une nouvelle référence pour la tâche de classification des produits.
 
-    # Texte pour la section Préconisations et Améliorations
-    preconisations_ameliorations = """
-    **Préconisations et Améliorations**
+    4. **Interprétation et Visualisation :**
+    - Pour garantir que nos modèles ne soient pas des "boîtes noires", nous avons investi du temps dans l'interprétation des activations intermédiaires et des cartes de classe, offrant ainsi une vue transparente sur le fonctionnement interne de nos modèles et leur prise de décision.
 
-    - Traduction en Français :  
-    Réduire le temps de traitement et le coût de la traduction en l'appliquant uniquement sur les catégories n’ayant pas le français comme langue majoritaire, pour améliorer l'efficacité de la modélisation.
+    5. **Défis et Limitations :**
+    - Bien que nous ayons rencontré des limitations techniques et matérielles, en particulier avec certains modèles de Deep Learning avancés comme VisualBERT, nous avons su adapter nos stratégies et tirer parti des architectures les plus efficaces disponibles.
 
-    - Rééquilibrage des Données :    
-    Rééquilibrer les données durant le pré-processing, afin que chaque catégorie soit représentée de manière équitable.
+    **Perspectives Futures :**
+    - Pour aller plus loin, nous pourrions envisager d'explorer des architectures de modèle encore plus sophistiquées, telles que les modèles multimodaux non aboutis. 
+    - L'intégration d'une analyse plus approfondie des activations intermédiaires et des représentations vectorielles pourrait également offrir des pistes pour affiner encore davantage nos modèles.
 
-    - Augmentation des Données :    
-    Utilisation des techniques d'augmentation des données pour enrichir le jeu de données existant. Transformations des images (rotation, recadrage, ajout de bruit...).
-
-    - Investigation sur de Nouveaux Modèles de Deep Learning :    
-    Explorer de nouveaux modèles de Deep Learning mieux adaptés à notre jeu de données (moins gourmands en ressources, en temps et plus efficace).  
-    
-    """
-     
-    # Affichage dans Streamlit
-    st.write(texte_principal) 
-
-    tabs = st.tabs(["Limites du modèle", "Préconisations et Améliorations"])
-
-    with tabs[0]:
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown(limite_modele)
-
-        with col2:
-            img_tabs = st.tabs(["Français 1", "Fraçais 2", "Français 3", "Précison", "Images", "Prédictions"])
-
-            with img_tabs[0]:
-                st.image("pie_1.png", caption="Le français en rouge", width=600)
-            with img_tabs[1]:
-                st.image("pie_2.png", caption="Le français en rouge", width=600)
-            with img_tabs[2]:
-                st.image("pie_3.png", caption="Le français en rouge", width=600)
-            with img_tabs[3]:
-                st.image("exemple_text.png", caption="Exemple de désignation", width=600)
-                st.write("""
-                        On remarque qu'ici que dans la variable "designation" la description de l'objet n'est pas détaillée!  
-                        Le modèle n'arrivera pas à définir qu'il s'agit d'un livre en se basant uniquement sur le texte.  
-                        Et même s'il y arriverait, il n'arrivera pas à choisir la bonne catégorie parmi les 4 qui définissent des livres ou magazines.  
-                        
-                        Donc le score ne dépend pas uniquement du modèle et de son entraînement, mais aussi de la qualité de la description des objets.  
-                        
-                        """)
-            with img_tabs[4]:
-                st.image("img_inter_2.png", caption="Cartes de saillance", width=400)
-            with img_tabs[5]:
-                st.image("mtx_eff_LSTM_rem.png", caption="Matrice de confusion EfficientNetB0-LSTM", width=600)                    
-
-    with tabs[1]:
-        st.markdown(preconisations_ameliorations)
+    En conclusion, notre projet a démontré que les techniques avancées de Machine Learning et de Deep Learning peuvent considérablement améliorer la classification des produits dans des environnements commerciaux à grande échelle comme Rakuten. Nous sommes convaincus que les approches développées ici peuvent servir de base solide pour des applications futures et contribuer à l'optimisation des processus de classification dans le secteur du commerce électronique.
+    """)
 
 elif page == "Démo":
-    st.markdown("<h1 class='red-title center-title'>Classification de produit</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='red-title center-title'>Démo</h1>", unsafe_allow_html=True)
+    st.markdown("### Prédiction du type de produit à partir de sa description et de son image")
+
+    # Exemple de description
+    description = st.text_area("Entrez la description du produit:", value="Chaussures de sport légères pour femmes, conçues pour le jogging, avec une semelle antidérapante et un excellent soutien de la voûte plantaire.")
     
-    tab1, tab2 = st.tabs(['Jeu de données "Test" Rakuten', "Autres données"])
+    # Exemple d'image
+    image = st.file_uploader("Téléchargez une image du produit:", type=["jpg", "jpeg", "png"])
 
-    with tab1:
-        st.header('Jeu de données "Test" Rakuten')
+    # Bouton de prédiction
+    if st.button("Prédire"):
+        if description and image:
+            # Afficher les entrées de l'utilisateur
+            st.write("**Description du produit:**")
+            st.write(description)
 
-        # Code spécifique au tab "Jeu de données Rakuten"
-        st.write("""
-        Ce tableau contient les 20 premières lignes du DataFrame final et affiche les codes des catégories d'objets prédits, du jeu de données "Test" Rakuten , calculés par le "Modèle hybride EfficientNetB0-LSTM".
-        """)
+            st.write("**Image du produit:**")
+            st.image(image, caption="Image téléchargée", use_column_width=True)
 
-        # Charger et afficher les 20 premières lignes du dataframe
-        df_prediction_final = load_data("df_prediction_final.csv")
-        
-        st.data_editor(
-            df_prediction_final.head(20),
-            column_config={
-                "Code catégorie prédite": st.column_config.NumberColumn(
-                    format="%d",
-                ),
-                "index": st.column_config.NumberColumn(
-                    format="%d",  # Utilisation de %d pour enlever la virgule des milliers dans l'index
-                )
-            },
-            hide_index=True,
-        )
-               
-        # st.dataframe(df_prediction_final.head(20))
+            # Ajouter un message d'état de traitement
+            st.write("**Prédiction en cours...**")
 
-    with tab2:
-        st.header("Autres données")
+            # Chargement du modèle et du tokenizer
+            model_url = "https://drive.google.com/uc?id=1-rGSvPR5Ng5dJqaw85a93SOZWG2L9SUu"
+            tokenizer_path = "tokenizer_distilbert.pickle"
+            le_path = "label_encoder.pickle"
+            model, tokenizer, label_encoder = load_model_and_tokenizer(model_url, tokenizer_path, le_path)
 
-        st.write("Il est possible de faire une prédiction de code de catégorie, pour tout objet unitaire, sur la base d'une descripion (texte) et d'une image de cet objet, et à condition qu'il respecte les **limitations de l'outil*.")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Charger les ressources pour la démo
-            def load_demo_resources():
-                try:
-                    tokenizer_path_d = "tokenizer.pkl"
-                    le_path_d = "label_encoder.pkl"
-                    model_path_d = "model_EfficientNetB0-LSTM.keras"
-                    categories_csv_path_d = "categories_prdtypecode.csv"
-
-                    with open(tokenizer_path_d, 'rb') as handle:
-                        tokenizer_demo = pickle.load(handle)
-
-                    with open(le_path_d, 'rb') as handle:
-                        le_demo = pickle.load(handle)
-
-                    model_demo = tf.keras.models.load_model(model_path_d)
-                    categorie_demo = pd.read_csv(categories_csv_path_d, sep=';')
-
-                    return tokenizer_demo, le_demo, model_demo, categorie_demo
-
-                except Exception as e:
-                    st.error(f"Erreur lors du chargement des ressources: {e}")
-                    return None, None, None, None
-
-            tokenizer_demo, le_demo, model_demo, categorie_demo = load_demo_resources()
-
-            # Prétraitement du texte
-            def preprocess_text(tokenizer_demo, text, max_len=100):
-                sequences = tokenizer_demo.texts_to_sequences([text])
-                text_data = pad_sequences(sequences, maxlen=max_len)
-                return text_data
+            # Prétraitement de la description
+            description_tokenized = tokenize_texts(tokenizer, [description])
 
             # Prétraitement de l'image
-            def load_and_preprocess_image(img_path_d, image_size=128):
-                img = load_img(img_path_d, target_size=(image_size, image_size))
-                img = img_to_array(img)
-                img = tf.keras.applications.efficientnet.preprocess_input(img)
-                return img
+            image_pil = Image.open(image)
+            image_resized = image_pil.resize((128, 128))
+            image_array = img_to_array(image_resized) / 255.0
+            image_array = np.expand_dims(image_array, axis=0)
 
-            if tokenizer_demo is None or le_demo is None or model_demo is None or categorie_demo is None:
-                st.error("Les ressources nécessaires n'ont pas pu être chargées.")
-            else:
-                # Entrée du texte de description du produit
-                description_text = st.text_input("Entrez la description du produit :")
+            # Prédiction
+            predictions = model.predict([description_tokenized["input_ids"], description_tokenized["attention_mask"], image_array])
+            predicted_label = label_encoder.inverse_transform(np.argmax(predictions, axis=1))[0]
 
-                # Téléchargement de l'image du produit
-                uploaded_file = st.file_uploader("Choisissez une image", type=["jpg", "jpeg", "png"])
+            # Afficher la prédiction
+            st.write("**Type de produit prédit:**")
+            st.write(predicted_label)
+        else:
+            st.write("Veuillez entrer une description et télécharger une image pour obtenir une prédiction.")
 
-                if st.button("Prédire"):
-                    if description_text and uploaded_file:
-                        # Sauvegarder l'image téléchargée temporairement
-                        image_path_d = os.path.join("temp_dir", uploaded_file.name)
-                        os.makedirs("temp_dir", exist_ok=True)  # Créer le dossier temporairement s'il n'existe pas
-                        with open(image_path_d, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-
-                        # Prétraiter les nouvelles données de texte et d'image
-                        text_data = preprocess_text(tokenizer_demo, description_text)
-                        image_data = np.expand_dims(load_and_preprocess_image(image_path_d), axis=0)
-
-                        # Faire des prédictions
-                        predictions = model_demo.predict([text_data, image_data])
-                        predicted_class = np.argmax(predictions, axis=1)[0]
-                        predicted_label = le_demo.inverse_transform([predicted_class])[0]
-
-                        # Trouver la désignation de la catégorie prédite
-                        category_row = categorie_demo[categorie_demo['code type'] == predicted_label]
-                        category_name = category_row['désignation de catégorie'].values[0] if not category_row.empty else "Inconnue"
-
-                        # Afficher l'image sélectionnée avec ses désignations, nom et prédiction
-                        img = Image.open(image_path_d)
-                        st.image(img, caption=f"Description: {description_text}\n\nNom: {os.path.basename(image_path_d)}\n\nPrédiction: {predicted_label} - {category_name}", width=300)
-
-                        # Afficher la catégorie prédite
-                        st.write(f"Catégorie prédite: {predicted_label} - {category_name}")
-
-                        # Supprimer l'image temporaire
-                        os.remove(image_path_d)
-                    else:
-                        st.write("Veuillez entrer une description et télécharger une image.")
-
-        with col2:
-            st.write("""
-                     **Voici des liens pour accèder à d'autres objets:**
-                     """)
-            
-            # Ajouter les logos avec hyperliens
-            st.markdown("""
-            <div style='display: flex; justify-content: space-around;'>
-                <a href='https://fr.shopping.rakuten.com' target='_blank'>
-                    <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' alt='Rakuten France' style='width: 100px;'>
-                </a>
-                <a href='https://www.amazon.fr' target='_blank'>
-                    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/2560px-Amazon_logo.svg.png' alt='Amazon France' style='width: 100px;'>
-                </a>
-                <a href='https://www.ikea.com/fr/fr/' target='_blank'>
-                    <img src='https://www.ikea.com/fr/fr/static/ikea-logo.3ee105eef6b5939c1269.svg' alt='Ikea France' style='width: 100px;'>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.write("")
-            st.write("")
-                     
-            st.write("""
-                    **Limitations de l'outil** (*)  
-                    Cet outil a été conçu pour répondre à la demande du « Challenge Rakuten ».  
-                    Par conséquent les catégories prédites sont celles définies par ce dernier dans le jeu de données « Y_train ».  
-                    Tout objet ne faisant pas partie de celles-ci, ne pourra pas être classifié correctement.   
-                    L’algorithme indiquera tout de même, la catégorie qui lui semble la plus proche.  
-
-                    **Rappel:** (Les catégories)
-                    """)
-            
-            # Charger et afficher le dataframe catégories
-            df_categorie = pd.read_csv("categories_prdtypecode.csv", sep=';')
-            
-            st.data_editor(
-                df_categorie,
-                column_config={
-                    "code type": st.column_config.NumberColumn(
-                        format="%d",
-                    )
-                },
-                hide_index=True,
-            )
-
-# Ajoutez des espaces vides pour pousser les noms en bas
-for i in range(2):
-    st.sidebar.text("")
-
-# Utilisez le Markdown avec une classe CSS personnalisée pour les petits titres
-st.sidebar.markdown('''
-<div class="reduced-spacing">
-    <p class="small-title">Auteurs:</p>
-    <p><a href="https://www.linkedin.com/in/labordecaroline/" target="_blank">Caroline LABORDE</a></p>
-    <p><a href="https://www.linkedin.com/in/soulaiman-cheddadi/" target="_blank">Soulaiman CHEDDADI</a></p>
-    <p><a href="https://www.linkedin.com/in/jean-gabrielmarchetta/" target="_blank">Jean-Gabriel MARCHETTA</a></p>
-    <p class="small-title">Mentor:</p>
-    <p>Eliott DOUIEB</p>
-</div>
-''', unsafe_allow_html=True)
-
-# Ajouter une ligne vide
-st.sidebar.text("")
-# Ajouter une ligne vide
-st.sidebar.text("")
-
-# Ajouter le logo de DataScientest dans la barre latérale avec un lien hypertexte
-st.sidebar.markdown(f"""
-<a href="https://datascientest.com/" target="_blank">
-    <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
-</a>
-""", unsafe_allow_html=True)
-st.sidebar.text("Datascientist - Bootcamp mars 2024")
