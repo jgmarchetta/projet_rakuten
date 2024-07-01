@@ -77,7 +77,15 @@ def load_data(csv_path):
     if not os.path.exists(csv_path):
         url = "https://1drv.ms/u/s!As8Ya4n-7uIMhtIBuxFHFX2wL9pbsg?e=zrrvzj"
         gdown.download(url, csv_path, quiet=False)
-    return pd.read_csv(csv_path)
+    
+    try:
+        return pd.read_csv(csv_path)
+    except pd.errors.ParserError:
+        st.error("Erreur de parsing lors de la lecture du fichier CSV. Tentative avec des options de lecture alternatives.")
+        return pd.read_csv(csv_path, delimiter=';', encoding='utf-8', error_bad_lines=False)
+
+df_train = load_data('X_train_update.csv')
+
 
 @st.cache_data
 def load_model_and_tokenizer(model_url, tokenizer_path, le_path):
