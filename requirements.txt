@@ -1,16 +1,14 @@
-streamlit>=1.14.0
-pandas>=1.3.3
-seaborn
-numpy>=1.21.2
+streamlit
+pandas
+numpy
 matplotlib
-tensorflow
+seaborn
+tensorflow==2.4.0  # Vous pouvez essayer différentes versions si nécessaire
 torch
-altair<5.0.0
 plotly
-scikit-learn
-transformers
-streamlit_elements
-scipy
-requests
 Pillow
-boto3
+scikit-learn
+gdown
+transformers
+streamlit-elements
+
