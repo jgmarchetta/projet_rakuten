@@ -82,10 +82,17 @@ def load_data(csv_path):
         return pd.read_csv(csv_path)
     except pd.errors.ParserError:
         st.error("Erreur de parsing lors de la lecture du fichier CSV. Tentative avec des options de lecture alternatives.")
-        return pd.read_csv(csv_path, delimiter=';', encoding='utf-8', error_bad_lines=False)
+        try:
+            return pd.read_csv(csv_path, delimiter=';', encoding='utf-8')
+        except pd.errors.ParserError:
+            st.error("Impossible de lire le fichier CSV même avec les options alternatives.")
+            return None
 
 df_train = load_data('X_train_update.csv')
-
+if df_train is not None:
+    st.dataframe(df_train)
+else:
+    st.error("Le fichier CSV n'a pas pu être chargé.")
 
 @st.cache_data
 def load_model_and_tokenizer(model_url, tokenizer_path, le_path):
