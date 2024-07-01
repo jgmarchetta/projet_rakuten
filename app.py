@@ -1,28 +1,22 @@
-import streamlit as st
+from bs4 import BeautifulSoup
 import pandas as pd
-import os
-import gdown
 
-@st.cache_data
-def read_file_head(csv_path, nlines=10):
-    if not os.path.exists(csv_path):
-        url = "https://1drv.ms/u/s!As8Ya4n-7uIMhtIBuxFHFX2wL9pbsg?e=zrrvzj"
-        gdown.download(url, csv_path, quiet=False)
-    
-    try:
-        with open(csv_path, 'r', encoding='utf-8') as file:
-            head_lines = []
-            for _ in range(nlines):
-                head_lines.append(file.readline())
-        return head_lines
-    except UnicodeDecodeError:
-        st.error("Erreur d'encodage lors de la lecture du fichier CSV.")
-        return None
+# Lire le fichier HTML
+with open('/mnt/data/fichier.html', 'r', encoding='utf-8') as file:
+    soup = BeautifulSoup(file, 'html.parser')
 
-# Afficher les premières lignes brutes du fichier CSV
-raw_head = read_file_head('X_train_update.csv')
-if raw_head is not None:
-    st.write("Premières lignes brutes du fichier CSV :")
-    st.text("".join(raw_head))
+# Trouver toutes les tables dans le fichier HTML
+tables = soup.find_all('table')
+
+# Si des tables existent, extraire les données et les convertir en CSV
+if tables:
+    for index, table in enumerate(tables):
+        # Lire la table en utilisant pandas
+        df = pd.read_html(str(table))[0]
+        
+        # Sauvegarder la table dans un fichier CSV
+        csv_filename = f'/mnt/data/table_{index + 1}.csv'
+        df.to_csv(csv_filename, index=False)
+        print(f'Table {index + 1} sauvegardée sous {csv_filename}')
 else:
-    st.error("Impossible de lire les premières lignes brutes du fichier CSV.")
+    print("Aucune table trouvée dans le fichier HTML.")
