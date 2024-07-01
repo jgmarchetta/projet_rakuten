@@ -1,28 +1,6 @@
+import os
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pickle
-import tensorflow as tf
-import torch
-import plotly.graph_objs as go
-import os
-import gdown
-
-from PIL import Image
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import Sequential, load_model, Model
-from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
-from streamlit_elements import elements, mui
 
 # Définir la configuration de la page pour utiliser toute la largeur de l'écran
 st.set_page_config(layout="wide")
@@ -73,9 +51,10 @@ pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "De
 page = st.sidebar.radio("Aller vers:", pages)
 
 @st.cache_data
-def load_data(csv_path, drive_url):
+def load_data(csv_path):
     if not os.path.exists(csv_path):
-        gdown.download(drive_url, csv_path, quiet=False)
+        url = "https://1drv.ms/u/s!As8Ya4n-7uIMhtIBuxFHFX2wL9pbsg?e=zrrvzj"
+        gdown.download(url, csv_path, quiet=False)
     return pd.read_csv(csv_path)
 
 @st.cache_data
@@ -211,24 +190,10 @@ if page == "Données":
     # Ajouter un selectbox pour choisir le jeu de données
     selected_dataset = st.selectbox("**Sélectionnez le jeu de données :**", ["X_train", "X_test", "Y_train", "Fichier Images Train"])
 
-    # URLs des fichiers
-    urls = {
-        'X_train': 'https://drive.google.com/uc?id=1dI7zqHcU1XhafXHNyk_339Oh6iPvqAzO',
-        'X_test': 'https://drive.google.com/uc?id=1dI7zqHcU1XhafXHNyk_339Oh6iPvqAzO',
-        'Y_train': 'https://drive.google.com/uc?id=1dI7zqHcU1XhafXHNyk_339Oh6iPvqAzO',
-    }
-
-    # Chemins locaux pour enregistrer les fichiers téléchargés
-    file_paths = {
-        'X_train': 'X_train_update.csv',
-        'X_test': 'X_test_update.csv',
-        'Y_train': 'Y_train_CVw08PX.csv',
-    }
-
     # Charger les données
-    df_train = load_data(file_paths['X_train'], urls['X_train'])
-    df_test = load_data(file_paths['X_test'], urls['X_test'])
-    df_target = load_data(file_paths['Y_train'], urls['Y_train'])
+    df_train = load_data('X_train_update.csv')
+    df_test = load_data('X_test_update.csv')
+    df_target = load_data('Y_train_CVw08PX.csv')
 
     # Fonctions pour afficher des graphiques
     def plot_missing_values_heatmap(df):
@@ -360,22 +325,40 @@ elif page == "Machine Learning":
     def add_model_expanders(images):
         with st.expander(f"**XGboost** Score F1-pondéré: {images['XGboost']['score']}"):
             st.write(f"Détails sur le modèle XGboost.")
-            st.image(images['XGboost']['path'], caption=None, width=1200)
+            if os.path.exists(images['XGboost']['path']):
+                st.image(images['XGboost']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['XGboost']['path']} non trouvée.")
         with st.expander(f"**SGD Classifier** Score F1-pondéré: {images['SGD Classifier']['score']}"):
             st.write(f"Détails sur le modèle SGD Classifier.")
-            st.image(images['SGD Classifier']['path'], caption=None, width=1200)
+            if os.path.exists(images['SGD Classifier']['path']):
+                st.image(images['SGD Classifier']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['SGD Classifier']['path']} non trouvée.")
         with st.expander(f"**Random Forest** Score F1-pondéré: {images['Random Forest']['score']}"):
             st.write(f"Détails sur le modèle Random Forest.")
-            st.image(images['Random Forest']['path'], caption=None, width=1200)
+            if os.path.exists(images['Random Forest']['path']):
+                st.image(images['Random Forest']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['Random Forest']['path']} non trouvée.")
         with st.expander(f"**Voting Classifier 'Soft'** Score F1-pondéré: {images['Voting Classifier Soft']['score']}"):
             st.write(f"Détails sur le modèle Voting Classifier 'Soft'.")
-            st.image(images['Voting Classifier Soft']['path'], caption=None, width=1200)
+            if os.path.exists(images['Voting Classifier Soft']['path']):
+                st.image(images['Voting Classifier Soft']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['Voting Classifier Soft']['path']} non trouvée.")
         with st.expander(f"**Voting Classifier 'Hard'** Score F1-pondéré: {images['Voting Classifier Hard']['score']}"):
             st.write(f"Détails sur le modèle Voting Classifier 'Hard'.")
-            st.image(images['Voting Classifier Hard']['path'], caption=None, width=1200)
+            if os.path.exists(images['Voting Classifier Hard']['path']):
+                st.image(images['Voting Classifier Hard']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['Voting Classifier Hard']['path']} non trouvée.")
         with st.expander(f"**Naive Bayes Gaussien** Score F1-pondéré: {images['Naive Bayes Gaussien']['score']}"):
             st.write(f"Détails sur le modèle Naive Bayes Gaussien.")
-            st.image(images['Naive Bayes Gaussien']['path'], caption=None, width=1200)
+            if os.path.exists(images['Naive Bayes Gaussien']['path']):
+                st.image(images['Naive Bayes Gaussien']['path'], caption=None, width=1200)
+            else:
+                st.error(f"Image {images['Naive Bayes Gaussien']['path']} non trouvée.")
 
     # Images pour chaque scénario avec scores
     images_scenario_A = {
@@ -436,7 +419,10 @@ elif page == "Machine Learning":
         st.write("")
         with st.expander("**Amélioration B** Score F1-pondéré: 0.79"):
             st.write("Détails sur Amélioration B.")
-            st.image("ameb.png", caption=None, width=400)
+            if os.path.exists("ameb.png"):
+                st.image("ameb.png", caption=None, width=400)
+            else:
+                st.error("Image ameb.png non trouvée.")
 
     # Contenu du tab Optimisation
     with tabs[4]:
@@ -446,10 +432,16 @@ elif page == "Machine Learning":
         st.write("")
         with st.expander("**SMOTE** Score F1-pondéré: 0.80"):
             st.write("Détails sur SMOTE.")
-            st.image("SMOTE.png", caption=None, width=400)
+            if os.path.exists("SMOTE.png"):
+                st.image("SMOTE.png", caption=None, width=400)
+            else:
+                st.error("Image SMOTE.png non trouvée.")
         with st.expander("**RandomUnderSampler** Score F1-pondéré: 0.74"):
             st.write("Détails sur RandomUnderSampler.")
-            st.image("RUS.png", caption=None, width=400)
+            if os.path.exists("RUS.png"):
+                st.image("RUS.png", caption=None, width=400)
+            else:
+                st.error("Image RUS.png non trouvée.")
 
 elif page == "Deep Learning":
     st.markdown("<h1 class='red-title center-title'>Les modèles de Deep Learning étudiés</h1>", unsafe_allow_html=True)
@@ -522,11 +514,17 @@ elif page == "Deep Learning":
 
             # Afficher la première image dans la première colonne
             with col1:
-                st.image(image1a, caption='Rapport de classification - Réseau de neurones denses avec Keras', width=450)
+                if os.path.exists(image1a):
+                    st.image(image1a, caption='Rapport de classification - Réseau de neurones denses avec Keras', width=450)
+                else:
+                    st.error(f"Image {image1a} non trouvée.")
 
             # Afficher la deuxième image dans la deuxième colonne
             with col2:
-                st.image(image2a, caption='Matrice de confusion - Réseau de neurones denses avec Keras')
+                if os.path.exists(image2a):
+                    st.image(image2a, caption='Matrice de confusion - Réseau de neurones denses avec Keras')
+                else:
+                    st.error(f"Image {image2a} non trouvée.")
 
         with st.expander("**ResNet50 - LSTM** Score F1-pondéré: 0.74"):
             st.write("""
@@ -573,11 +571,17 @@ elif page == "Deep Learning":
 
             # Afficher la première image dans la première colonne
             with col1:
-                st.image(image1b, caption='Rapport de classification - ResNet50 - LSTM', width=450)
+                if os.path.exists(image1b):
+                    st.image(image1b, caption='Rapport de classification - ResNet50 - LSTM', width=450)
+                else:
+                    st.error(f"Image {image1b} non trouvée.")
 
             # Afficher la deuxième image dans la deuxième colonne
             with col2:
-                st.image(image2b, caption='Matrice de confusion - ResNet50 - LSTM')    
+                if os.path.exists(image2b):
+                    st.image(image2b, caption='Matrice de confusion - ResNet50 - LSTM')
+                else:
+                    st.error(f"Image {image2b} non trouvée.")
             
         with st.expander("**DistilBERT** Score F1-pondéré: 0.92"):
             st.write("""
@@ -714,11 +718,17 @@ elif page == "Deep Learning":
 
             # Afficher la première image dans la première colonne
             with col1:
-                st.image(image1c, caption='Rapport de classification - DistilBERT', width=450)
+                if os.path.exists(image1c):
+                    st.image(image1c, caption='Rapport de classification - DistilBERT', width=450)
+                else:
+                    st.error(f"Image {image1c} non trouvée.")
 
             # Afficher la deuxième image dans la deuxième colonne
             with col2:
-                st.image(image2c, caption='Matrice de confusion - DistilBERT')                   
+                if os.path.exists(image2c):
+                    st.image(image2c, caption='Matrice de confusion - DistilBERT')
+                else:
+                    st.error(f"Image {image2c} non trouvée.")
                   
         with st.expander("**EfficientNetB0 - LSTM** Score F1-pondéré: 0.96"):
             st.write("""
@@ -766,11 +776,17 @@ elif page == "Deep Learning":
 
             # Afficher la première image dans la première colonne
             with col1:
-                st.image(image1d, caption='Rapport de classification - EfficientNetB0 - LSTM', width=450)
+                if os.path.exists(image1d):
+                    st.image(image1d, caption='Rapport de classification - EfficientNetB0 - LSTM', width=450)
+                else:
+                    st.error(f"Image {image1d} non trouvée.")
 
             # Afficher la deuxième image dans la deuxième colonne
             with col2:
-                st.image(image2d, caption='Matrice de confusion - EfficientNetB0 - LSTM')       
+                if os.path.exists(image2d):
+                    st.image(image2d, caption='Matrice de confusion - EfficientNetB0 - LSTM')
+                else:
+                    st.error(f"Image {image2d} non trouvée.")
            
         with st.expander("**Modèles Non-Aboutis**"):
             st.write("""
@@ -973,225 +989,9 @@ elif page == "Conclusion":
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown(limite_modele)
-
+            st.image("categories_limites.png", width=450)   
         with col2:
-            img_tabs = st.tabs(["Français 1", "Fraçais 2", "Français 3", "Précison", "Images", "Prédictions"])
-
-            with img_tabs[0]:
-                st.image("pie_1.png", caption="Le français en rouge", width=600)
-            with img_tabs[1]:
-                st.image("pie_2.png", caption="Le français en rouge", width=600)
-            with img_tabs[2]:
-                st.image("pie_3.png", caption="Le français en rouge", width=600)
-            with img_tabs[3]:
-                st.image("exemple_text.png", caption="Exemple de désignation", width=600)
-                st.write("""
-                        On remarque qu'ici que dans la variable "designation" la description de l'objet n'est pas détaillée!  
-                        Le modèle n'arrivera pas à définir qu'il s'agit d'un livre en se basant uniquement sur le texte.  
-                        Et même s'il y arriverait, il n'arrivera pas à choisir la bonne catégorie parmi les 4 qui définissent des livres ou magazines.  
-                        
-                        Donc le score ne dépend pas uniquement du modèle et de son entraînement, mais aussi de la qualité de la description des objets.  
-                        
-                        """)
-            with img_tabs[4]:
-                st.image("img_inter_2.png", caption="Cartes de saillance", width=400)
-            with img_tabs[5]:
-                st.image("mtx_eff_LSTM_rem.png", caption="Matrice de confusion EfficientNetB0-LSTM", width=600)                    
-
-    with tabs[1]:
-        st.markdown(preconisations_ameliorations)
-
-elif page == "Démo":
-    st.markdown("<h1 class='red-title center-title'>Classification de produit</h1>", unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(['Jeu de données "Test" Rakuten', "Autres données"])
-
-    with tab1:
-        st.header('Jeu de données "Test" Rakuten')
-
-        # Code spécifique au tab "Jeu de données Rakuten"
-        st.write("""
-        Ce tableau contient les 20 premières lignes du DataFrame final et affiche les codes des catégories d'objets prédits, du jeu de données "Test" Rakuten , calculés par le "Modèle hybride EfficientNetB0-LSTM".
-        """)
-
-        # Charger et afficher les 20 premières lignes du dataframe
-        df_prediction_final = load_data("df_prediction_final.csv")
+            st.write(limite_modele)
         
-        st.data_editor(
-            df_prediction_final.head(20),
-            column_config={
-                "Code catégorie prédite": st.column_config.NumberColumn(
-                    format="%d",
-                ),
-                "index": st.column_config.NumberColumn(
-                    format="%d",  # Utilisation de %d pour enlever la virgule des milliers dans l'index
-                )
-            },
-            hide_index=True,
-        )
-               
-        # st.dataframe(df_prediction_final.head(20))
-
-    with tab2:
-        st.header("Autres données")
-
-        st.write("Il est possible de faire une prédiction de code de catégorie, pour tout objet unitaire, sur la base d'une descripion (texte) et d'une image de cet objet, et à condition qu'il respecte les **limitations de l'outil*.")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Charger les ressources pour la démo
-            def load_demo_resources():
-                try:
-                    tokenizer_path_d = "tokenizer.pkl"
-                    le_path_d = "label_encoder.pkl"
-                    model_path_d = "model_EfficientNetB0-LSTM.keras"
-                    categories_csv_path_d = "categories_prdtypecode.csv"
-
-                    with open(tokenizer_path_d, 'rb') as handle:
-                        tokenizer_demo = pickle.load(handle)
-
-                    with open(le_path_d, 'rb') as handle:
-                        le_demo = pickle.load(handle)
-
-                    model_demo = tf.keras.models.load_model(model_path_d)
-                    categorie_demo = pd.read_csv(categories_csv_path_d, sep=';')
-
-                    return tokenizer_demo, le_demo, model_demo, categorie_demo
-
-                except Exception as e:
-                    st.error(f"Erreur lors du chargement des ressources: {e}")
-                    return None, None, None, None
-
-            tokenizer_demo, le_demo, model_demo, categorie_demo = load_demo_resources()
-
-            # Prétraitement du texte
-            def preprocess_text(tokenizer_demo, text, max_len=100):
-                sequences = tokenizer_demo.texts_to_sequences([text])
-                text_data = pad_sequences(sequences, maxlen=max_len)
-                return text_data
-
-            # Prétraitement de l'image
-            def load_and_preprocess_image(img_path_d, image_size=128):
-                img = load_img(img_path_d, target_size=(image_size, image_size))
-                img = img_to_array(img)
-                img = tf.keras.applications.efficientnet.preprocess_input(img)
-                return img
-
-            if tokenizer_demo is None or le_demo is None or model_demo is None or categorie_demo is None:
-                st.error("Les ressources nécessaires n'ont pas pu être chargées.")
-            else:
-                # Entrée du texte de description du produit
-                description_text = st.text_input("Entrez la description du produit :")
-
-                # Téléchargement de l'image du produit
-                uploaded_file = st.file_uploader("Choisissez une image", type=["jpg", "jpeg", "png"])
-
-                if st.button("Prédire"):
-                    if description_text and uploaded_file:
-                        # Sauvegarder l'image téléchargée temporairement
-                        image_path_d = os.path.join("temp_dir", uploaded_file.name)
-                        os.makedirs("temp_dir", exist_ok=True)  # Créer le dossier temporairement s'il n'existe pas
-                        with open(image_path_d, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-
-                        # Prétraiter les nouvelles données de texte et d'image
-                        text_data = preprocess_text(tokenizer_demo, description_text)
-                        image_data = np.expand_dims(load_and_preprocess_image(image_path_d), axis=0)
-
-                        # Faire des prédictions
-                        predictions = model_demo.predict([text_data, image_data])
-                        predicted_class = np.argmax(predictions, axis=1)[0]
-                        predicted_label = le_demo.inverse_transform([predicted_class])[0]
-
-                        # Trouver la désignation de la catégorie prédite
-                        category_row = categorie_demo[categorie_demo['code type'] == predicted_label]
-                        category_name = category_row['désignation de catégorie'].values[0] if not category_row.empty else "Inconnue"
-
-                        # Afficher l'image sélectionnée avec ses désignations, nom et prédiction
-                        img = Image.open(image_path_d)
-                        st.image(img, caption=f"Description: {description_text}\n\nNom: {os.path.basename(image_path_d)}\n\nPrédiction: {predicted_label} - {category_name}", width=300)
-
-                        # Afficher la catégorie prédite
-                        st.write(f"Catégorie prédite: {predicted_label} - {category_name}")
-
-                        # Supprimer l'image temporaire
-                        os.remove(image_path_d)
-                    else:
-                        st.write("Veuillez entrer une description et télécharger une image.")
-
-        with col2:
-            st.write("""
-                     **Voici des liens pour accèder à d'autres objets:**
-                     """)
-            
-            # Ajouter les logos avec hyperliens
-            st.markdown("""
-            <div style='display: flex; justify-content: space-around;'>
-                <a href='https://fr.shopping.rakuten.com' target='_blank'>
-                    <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' alt='Rakuten France' style='width: 100px;'>
-                </a>
-                <a href='https://www.amazon.fr' target='_blank'>
-                    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/2560px-Amazon_logo.svg.png' alt='Amazon France' style='width: 100px;'>
-                </a>
-                <a href='https://www.ikea.com/fr/fr/' target='_blank'>
-                    <img src='https://www.ikea.com/fr/fr/static/ikea-logo.3ee105eef6b5939c1269.svg' alt='Ikea France' style='width: 100px;'>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.write("")
-            st.write("")
-                     
-            st.write("""
-                    **Limitations de l'outil** (*)  
-                    Cet outil a été conçu pour répondre à la demande du « Challenge Rakuten ».  
-                    Par conséquent les catégories prédites sont celles définies par ce dernier dans le jeu de données « Y_train ».  
-                    Tout objet ne faisant pas partie de celles-ci, ne pourra pas être classifié correctement.   
-                    L’algorithme indiquera tout de même, la catégorie qui lui semble la plus proche.  
-
-                    **Rappel:** (Les catégories)
-                    """)
-            
-            # Charger et afficher le dataframe catégories
-            df_categorie = pd.read_csv("categories_prdtypecode.csv", sep=';')
-            
-            st.data_editor(
-                df_categorie,
-                column_config={
-                    "code type": st.column_config.NumberColumn(
-                        format="%d",
-                    )
-                },
-                hide_index=True,
-            )
-
-# Ajoutez des espaces vides pour pousser les noms en bas
-for i in range(2):
-    st.sidebar.text("")
-
-# Utilisez le Markdown avec une classe CSS personnalisée pour les petits titres
-st.sidebar.markdown('''
-<div class="reduced-spacing">
-    <p class="small-title">Auteurs:</p>
-    <p><a href="https://www.linkedin.com/in/labordecaroline/" target="_blank">Caroline LABORDE</a></p>
-    <p><a href="https://www.linkedin.com/in/soulaiman-cheddadi/" target="_blank">Soulaiman CHEDDADI</a></p>
-    <p><a href="https://www.linkedin.com/in/jean-gabrielmarchetta/" target="_blank">Jean-Gabriel MARCHETTA</a></p>
-    <p class="small-title">Mentor:</p>
-    <p>Eliott DOUIEB</p>
-</div>
-''', unsafe_allow_html=True)
-
-# Ajouter une ligne vide
-st.sidebar.text("")
-# Ajouter une ligne vide
-st.sidebar.text("")
-
-# Ajouter le logo de DataScientest dans la barre latérale avec un lien hypertexte
-st.sidebar.markdown(f"""
-<a href="https://datascientest.com/" target="_blank">
-    <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
-</a>
-""", unsafe_allow_html=True)
-st.sidebar.text("Datascientist - Bootcamp mars 2024")
+    with tabs[1]:
+        st.write(preconisations_ameliorations)
