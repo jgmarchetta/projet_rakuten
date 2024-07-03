@@ -1,14 +1,12 @@
-streamlit==1.36.0
-pandas==2.2.2
-numpy==1.23.5  # Version compatible avec toutes les autres dépendances
-matplotlib==3.9.0
-seaborn==0.13.2
-tensorflow==2.15.1
-torch
-plotly
-Pillow
-scikit-learn
-gdown
-transformers
-streamlit-elements
-
+streamlit==1.15.0
+pandas==1.3.3
+numpy==1.21.2
+matplotlib==3.4.3
+seaborn==0.11.2
+tensorflow==2.8.0
+torch==1.10.0
+plotly==5.3.1
+Pillow==8.4.0
+scikit-learn==0.24.2
+transformers==4.11.3
+gdown==4.2.0
