@@ -9,7 +9,6 @@ import torch
 import plotly.graph_objs as go
 import os
 import gdown
-
 from PIL import Image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
@@ -24,8 +23,10 @@ from transformers import DistilBertTokenizer, DistilBertForSequenceClassificatio
 from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
 from streamlit_elements import elements, mui
 
+# Définir la configuration de la page pour utiliser toute la largeur de l'écran
 st.set_page_config(layout="wide")
 
+# Définir le CSS directement dans le script
 css = """
 <style>
 body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMarkdown, .stSidebar, .stTitle, .stHeader, .stRadio {
@@ -35,12 +36,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
     font-family: 'Arial', sans-serif;
 }
 .small-title {
-    font-size: 14px;
+    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
     font-weight: bold;
 }
 .reduced-spacing p {
-    margin-bottom: 5px;
-    margin-top: 5px;
+    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
+    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
 }
 .red-title {
     color: #BF0000;
@@ -54,8 +55,10 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 </style>
 """
 
+# Injecter le CSS dans l'application Streamlit
 st.markdown(css, unsafe_allow_html=True)
 
+# Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
 <a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
     <img src='https://fr.shopping.rakuten.com/visuels/0_content_square/autres/rakuten-logo6.svg' style="width: 100%;">
@@ -67,36 +70,34 @@ pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "De
 page = st.sidebar.radio("Aller vers:", pages)
 
 @st.cache_data
-def load_data(csv_path):
-    try:
-        if not os.path.exists(csv_path):
-            url = "https://1drv.ms/u/s!As8Ya4n-7uIMhtIBuxFHFX2wL9pbsg?e=zrrvzj"
-            gdown.download(url, csv_path, quiet=False)
-        return pd.read_csv(csv_path)
-    except Exception as e:
-        st.error(f"Erreur lors du chargement des données : {e}")
-        return None
+def download_file_from_gdrive(url, output):
+    gdown.download(url, output, quiet=False)
 
 @st.cache_data
-def load_model_and_tokenizer(model_url, tokenizer_path, le_path):
-    try:
-        model_path = "model_EfficientNetB0-LSTM.keras"
-        if not os.path.exists(model_path):
-            gdown.download(model_url, model_path, quiet=False)
+def load_data(csv_path):
+    if not os.path.exists(csv_path):
+        url = "https://drive.google.com/uc?id=1dI7zqHcU1XhafXHNyk_339Oh6iPvqAzO"
+        download_file_from_gdrive(url, csv_path)
+    return pd.read_csv(csv_path)
 
-        model = load_model(model_path)
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
-        
-        with open(tokenizer_path, 'rb') as handle:
-            tokenizer = pickle.load(handle)
-        
-        with open(le_path, 'rb') as handle:
-            le = pickle.load(handle)
-        
-        return model, tokenizer, le
-    except Exception as e:
-        st.error(f"Erreur lors du chargement du modèle et du tokenizer : {e}")
-        return None, None, None
+@st.cache_data
+def load_model_and_tokenizer():
+    model_url = "https://drive.google.com/uc?id=1gTzOmXPTWh_zsQHxYr7pKK8GKtmIUIYr"
+    tokenizer_path = "tokenizer.pkl"
+    le_path = "label_encoder.pkl"
+
+    # Télécharger le modèle depuis Google Drive
+    model_path = "model_EfficientNetB0-LSTM.keras"
+    if not os.path.exists(model_path):
+        download_file_from_gdrive(model_url, model_path)
+    
+    model = load_model(model_path)
+    model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+    with open(tokenizer_path, 'rb') as handle:
+        tokenizer = pickle.load(handle)
+    with open(le_path, 'rb') as handle:
+        le = pickle.load(handle)
+    return model, tokenizer, le
 
 @st.cache_data
 def preprocess_data(df, _label_encoder):
@@ -176,6 +177,7 @@ def predict_and_evaluate(_model, loader, device):
 if page == "Présentation":
     st.markdown("<h1 class='red-title center-title'>Projet Rakuten - Classification Multimodal</h1>", unsafe_allow_html=True)
 
+    # Tabs for different sections
     tab1, tab2 = st.tabs(["Contexte", "Objectif du projet"])
 
     with tab1:
@@ -212,12 +214,15 @@ if page == "Données":
         st.markdown("- X_train\n- X_test\n- Y_train\n- Fichier Images scindé en 2 fichiers image_train & image_test")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # Ajouter un selectbox pour choisir le jeu de données
     selected_dataset = st.selectbox("**Sélectionnez le jeu de données :**", ["X_train", "X_test", "Y_train", "Fichier Images Train"])
 
+    # Charger les données
     df_train = load_data('X_train_update.csv')
     df_test = load_data('X_test_update.csv')
     df_target = load_data('Y_train_CVw08PX.csv')
 
+    # Fonctions pour afficher des graphiques
     def plot_missing_values_heatmap(df):
         fig, ax = plt.subplots(figsize=(8, 4))
         sns.heatmap(df.isnull(), cmap=sns.color_palette(['#828282', '#BF0000']), cbar=False, ax=ax)
@@ -243,7 +248,8 @@ if page == "Données":
         for i, v in enumerate([unique_percentage, duplicate_percentage]):
             ax.text(v + 1, i, f"{v:.2f}%", color="black", va="center")
         st.pyplot(fig)
-
+        
+    # Afficher les informations en fonction du choix
     if selected_dataset == "X_train":
         st.write("Vous avez sélectionné le jeu de données X_train.")
         st.data_editor(
@@ -339,8 +345,10 @@ if page == "Pré-processing":
 elif page == "Machine Learning":
     st.markdown("<h1 class='red-title center-title'>Machine Learning</h1>", unsafe_allow_html=True)
     
+    # Définir les onglets
     tabs = st.tabs(["Scénario A", "Scénario B", "Scénario E", "Amélioration", "Optimisation"])
 
+    # Fonction pour ajouter les expanders de modèles avec des images spécifiques
     def add_model_expanders(images):
         with st.expander(f"**XGboost** Score F1-pondéré: {images['XGboost']['score']}"):
             st.write(f"Détails sur le modèle XGboost.")
@@ -361,6 +369,7 @@ elif page == "Machine Learning":
             st.write(f"Détails sur le modèle Naive Bayes Gaussien.")
             st.image(images['Naive Bayes Gaussien']['path'], caption=None, width=1200)
 
+    # Images pour chaque scénario avec scores
     images_scenario_A = {
         'XGboost': {'path': 'A_XGboost.png', 'score': 0.73},
         'SGD Classifier': {'path': 'A_SGD Classifier.png', 'score': 0.68},
@@ -388,6 +397,7 @@ elif page == "Machine Learning":
         'Naive Bayes Gaussien': {'path': 'E_NBG.png', 'score': 0.50}
     }
 
+    # Contenu du tab Scénario A
     with tabs[0]:
         st.header("Scénario A")
         st.write("Vectorisation des images par CNN, vectorisation du texte avec SPACY sans traduction de texte")
@@ -395,6 +405,7 @@ elif page == "Machine Learning":
         st.write("Les modèles:")
         add_model_expanders(images_scenario_A)
 
+    # Contenu du tab Scénario B
     with tabs[1]:
         st.header("Scénario B")
         st.write("Vectorisation des images par CNN, vectorisation du texte avec TF-IDF, après tokenisation, lemmatisation, application des stop-words, sans traduction de texte et une réduction par TruncatedSVD")
@@ -402,6 +413,7 @@ elif page == "Machine Learning":
         st.write("Les modèles:")
         add_model_expanders(images_scenario_B)
 
+    # Contenu du tab Scénario E
     with tabs[2]:
         st.header("Scénario E")
         st.write("Même vectorisation que scénario B avec traduction de texte dans la langue majoritaire, à savoir le français")
@@ -409,6 +421,7 @@ elif page == "Machine Learning":
         st.write("Les modèles:")
         add_model_expanders(images_scenario_E)
 
+    # Contenu du tab Amélioration
     with tabs[3]:
         st.header("Amélioration")
         st.write("Étape 1 : Recherche des Meilleurs Hyperparamètres")
@@ -417,6 +430,7 @@ elif page == "Machine Learning":
             st.write("Détails sur Amélioration B.")
             st.image("ameb.png", caption=None, width=400)
 
+    # Contenu du tab Optimisation
     with tabs[4]:
         st.header("Optimisation")
         st.write("Étape 2 : Validation Croisée")
@@ -432,6 +446,7 @@ elif page == "Machine Learning":
 elif page == "Deep Learning":
     st.markdown("<h1 class='red-title center-title'>Les modèles de Deep Learning étudiés</h1>", unsafe_allow_html=True)
  
+    # Tab creation
     tab1, tab2, tab3, tab4 = st.tabs(["Benchmark", "Les modèles étudiés", "Synthèse des scores de F1-pondéré", "Interprétation"])
 
     with tab1:
@@ -490,14 +505,18 @@ elif page == "Deep Learning":
             st.write("")
             st.write("")
 
+            # Charger les images
             image1a = "rep_dnn.png"
             image2a = "mtx_dnn.png"
 
+            # Créer deux colonnes
             col1, col2 = st.columns(2)
 
+            # Afficher la première image dans la première colonne
             with col1:
                 st.image(image1a, caption='Rapport de classification - Réseau de neurones denses avec Keras', width=450)
 
+            # Afficher la deuxième image dans la deuxième colonne
             with col2:
                 st.image(image2a, caption='Matrice de confusion - Réseau de neurones denses avec Keras')
 
@@ -537,14 +556,18 @@ elif page == "Deep Learning":
             st.write("")
             st.write("")
 
+            # Charger les images
             image1b = "rep_dnn.png"
             image2b = "mtx_dnn.png"
 
+            # Créer deux colonnes
             col1, col2 = st.columns(2)
 
+            # Afficher la première image dans la première colonne
             with col1:
                 st.image(image1b, caption='Rapport de classification - ResNet50 - LSTM', width=450)
 
+            # Afficher la deuxième image dans la deuxième colonne
             with col2:
                 st.image(image2b, caption='Matrice de confusion - ResNet50 - LSTM')    
             
@@ -674,14 +697,18 @@ elif page == "Deep Learning":
             st.write("")
             st.write("")
             
+            # Charger les images
             image1c = "rep_d_bert.png"
             image2c = "mtx_d_bert.png"
 
+            # Créer deux colonnes
             col1, col2 = st.columns(2)
 
+            # Afficher la première image dans la première colonne
             with col1:
                 st.image(image1c, caption='Rapport de classification - DistilBERT', width=450)
 
+            # Afficher la deuxième image dans la deuxième colonne
             with col2:
                 st.image(image2c, caption='Matrice de confusion - DistilBERT')                   
                   
@@ -722,14 +749,18 @@ elif page == "Deep Learning":
             st.write("")
             st.write("")
             
+            # Charger les images
             image1d = "rep_eff_lstm.png"
             image2d = "mtx_eff_LSTM.png"
 
+            # Créer deux colonnes
             col1, col2 = st.columns(2)
 
+            # Afficher la première image dans la première colonne
             with col1:
                 st.image(image1d, caption='Rapport de classification - EfficientNetB0 - LSTM', width=450)
 
+            # Afficher la deuxième image dans la deuxième colonne
             with col2:
                 st.image(image2d, caption='Matrice de confusion - EfficientNetB0 - LSTM')       
            
@@ -874,6 +905,7 @@ elif page == "Deep Learning":
 elif page == "Conclusion":
     st.markdown("<h1 class='red-title center-title'>Conclusion</h1>", unsafe_allow_html=True)
 
+    # Texte principal
     texte_principal = """
     Les choix effectués tout au long du projet ont été guidés par des objectifs de performance et de robustesse.  
       
@@ -887,6 +919,7 @@ elif page == "Conclusion":
     
     """
 
+    # Texte pour la section Limite du modèle 
     limite_modele = """
     **Limites du modèle**  
     
@@ -905,6 +938,7 @@ elif page == "Conclusion":
     """
 
 
+    # Texte pour la section Préconisations et Améliorations
     preconisations_ameliorations = """
     **Préconisations et Améliorations**
 
@@ -922,6 +956,7 @@ elif page == "Conclusion":
     
     """
      
+    # Affichage dans Streamlit
     st.write(texte_principal) 
 
     tabs = st.tabs(["Limites du modèle", "Préconisations et Améliorations"])
@@ -967,10 +1002,12 @@ elif page == "Démo":
     with tab1:
         st.header('Jeu de données "Test" Rakuten')
 
+        # Code spécifique au tab "Jeu de données Rakuten"
         st.write("""
         Ce tableau contient les 20 premières lignes du DataFrame final et affiche les codes des catégories d'objets prédits, du jeu de données "Test" Rakuten , calculés par le "Modèle hybride EfficientNetB0-LSTM".
         """)
 
+        # Charger et afficher les 20 premières lignes du dataframe
         df_prediction_final = load_data("df_prediction_final.csv")
         
         st.data_editor(
@@ -986,6 +1023,8 @@ elif page == "Démo":
             hide_index=True,
         )
                
+        # st.dataframe(df_prediction_final.head(20))
+
     with tab2:
         st.header("Autres données")
 
@@ -994,6 +1033,7 @@ elif page == "Démo":
         col1, col2 = st.columns(2)
 
         with col1:
+            # Charger les ressources pour la démo
             def load_demo_resources():
                 try:
                     tokenizer_path_d = "tokenizer.pkl"
@@ -1018,11 +1058,13 @@ elif page == "Démo":
 
             tokenizer_demo, le_demo, model_demo, categorie_demo = load_demo_resources()
 
+            # Prétraitement du texte
             def preprocess_text(tokenizer_demo, text, max_len=100):
                 sequences = tokenizer_demo.texts_to_sequences([text])
                 text_data = pad_sequences(sequences, maxlen=max_len)
                 return text_data
 
+            # Prétraitement de l'image
             def load_and_preprocess_image(img_path_d, image_size=128):
                 img = load_img(img_path_d, target_size=(image_size, image_size))
                 img = img_to_array(img)
@@ -1032,31 +1074,41 @@ elif page == "Démo":
             if tokenizer_demo is None or le_demo is None or model_demo is None or categorie_demo is None:
                 st.error("Les ressources nécessaires n'ont pas pu être chargées.")
             else:
+                # Entrée du texte de description du produit
                 description_text = st.text_input("Entrez la description du produit :")
+
+                # Téléchargement de l'image du produit
                 uploaded_file = st.file_uploader("Choisissez une image", type=["jpg", "jpeg", "png"])
 
                 if st.button("Prédire"):
                     if description_text and uploaded_file:
+                        # Sauvegarder l'image téléchargée temporairement
                         image_path_d = os.path.join("temp_dir", uploaded_file.name)
-                        os.makedirs("temp_dir", exist_ok=True)
+                        os.makedirs("temp_dir", exist_ok=True)  # Créer le dossier temporairement s'il n'existe pas
                         with open(image_path_d, "wb") as f:
                             f.write(uploaded_file.getbuffer())
 
+                        # Prétraiter les nouvelles données de texte et d'image
                         text_data = preprocess_text(tokenizer_demo, description_text)
                         image_data = np.expand_dims(load_and_preprocess_image(image_path_d), axis=0)
 
+                        # Faire des prédictions
                         predictions = model_demo.predict([text_data, image_data])
                         predicted_class = np.argmax(predictions, axis=1)[0]
                         predicted_label = le_demo.inverse_transform([predicted_class])[0]
 
+                        # Trouver la désignation de la catégorie prédite
                         category_row = categorie_demo[categorie_demo['code type'] == predicted_label]
                         category_name = category_row['désignation de catégorie'].values[0] if not category_row.empty else "Inconnue"
 
+                        # Afficher l'image sélectionnée avec ses désignations, nom et prédiction
                         img = Image.open(image_path_d)
                         st.image(img, caption=f"Description: {description_text}\n\nNom: {os.path.basename(image_path_d)}\n\nPrédiction: {predicted_label} - {category_name}", width=300)
 
+                        # Afficher la catégorie prédite
                         st.write(f"Catégorie prédite: {predicted_label} - {category_name}")
 
+                        # Supprimer l'image temporaire
                         os.remove(image_path_d)
                     else:
                         st.write("Veuillez entrer une description et télécharger une image.")
@@ -1066,6 +1118,7 @@ elif page == "Démo":
                      **Voici des liens pour accèder à d'autres objets:**
                      """)
             
+            # Ajouter les logos avec hyperliens
             st.markdown("""
             <div style='display: flex; justify-content: space-around;'>
                 <a href='https://fr.shopping.rakuten.com' target='_blank'>
@@ -1093,6 +1146,7 @@ elif page == "Démo":
                     **Rappel:** (Les catégories)
                     """)
             
+            # Charger et afficher le dataframe catégories
             df_categorie = pd.read_csv("categories_prdtypecode.csv", sep=';')
             
             st.data_editor(
@@ -1105,9 +1159,11 @@ elif page == "Démo":
                 hide_index=True,
             )
 
+# Ajoutez des espaces vides pour pousser les noms en bas
 for i in range(2):
     st.sidebar.text("")
 
+# Utilisez le Markdown avec une classe CSS personnalisée pour les petits titres
 st.sidebar.markdown('''
 <div class="reduced-spacing">
     <p class="small-title">Auteurs:</p>
@@ -1119,12 +1175,15 @@ st.sidebar.markdown('''
 </div>
 ''', unsafe_allow_html=True)
 
+# Ajouter une ligne vide
 st.sidebar.text("")
+# Ajouter une ligne vide
 st.sidebar.text("")
 
+# Ajouter le logo de DataScientest dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
 <a href="https://datascientest.com/" target="_blank">
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
-st.sidebar.text("Datascientist - Bootcamp mars 2024")
+st.sidebar.text("Datascientist - Bootcamp mars 2024")                                                                            
