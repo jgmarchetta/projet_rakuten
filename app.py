@@ -428,7 +428,7 @@ elif page == "Machine Learning":
         st.write("")
         with st.expander("**Amélioration B** Score F1-pondéré: 0.79"):
             st.write("Détails sur Amélioration B.")
-            st.image("ameb.png", caption=None, width=400)
+            st.image("Ameb.png", caption=None, width=400)
 
     # Contenu du tab Optimisation
     with tabs[4]:
