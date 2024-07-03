@@ -1185,4 +1185,3 @@ st.sidebar.markdown(f"""
 </a>
 """, unsafe_allow_html=True)
 st.sidebar.text("Datascientist - Bootcamp mars 2024")
-
