@@ -9,19 +9,17 @@ import torch
 import plotly.graph_objs as go
 import os
 import gdown
+
 from PIL import Image
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import Sequential, load_model, Model
-from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D
+from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
-from streamlit_elements import elements, mui
+from torch.utils.data import DataLoader, Dataset
 
 # Définir la configuration de la page pour utiliser toute la largeur de l'écran
 st.set_page_config(layout="wide")
@@ -36,12 +34,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
     font-family: 'Arial', sans-serif;
 }
 .small-title {
-    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
+    font-size: 14px;
     font-weight: bold;
 }
 .reduced-spacing p {
-    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
-    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
+    margin-bottom: 5px;
+    margin-top: 5px;
 }
 .red-title {
     color: #BF0000;
@@ -1186,4 +1184,4 @@ st.sidebar.markdown(f"""
     <img src="https://datascientest.com/wp-content/uploads/2022/03/logo-2021.png" style="width: 100%;">
 </a>
 """, unsafe_allow_html=True)
-st.sidebar.text("Datascientist - Bootcamp mars 2024")                                                                            
+st.sidebar.text("Datascientist - Bootcamp mars 2024")
