@@ -80,17 +80,31 @@ def load_data(csv_path):
 
 @st.cache_data
 def load_model_and_tokenizer():
-    model_url = "https://drive.google.com/uc?id=1gTzOmXPTWh_zsQHxYr7pKK8GKtmIUIYr"
+    model_urls = [
+        "https://drive.google.com/uc?id=1zpL2QgpB38-Vp9zgC3f5lIXo5rfG_yja",
+        "https://drive.google.com/uc?id=1aCnpLSshh9k2V1FSt9M2FlfVi1jemn2O",
+        "https://drive.google.com/drive/folders/12HdIzlakwDZyO60JpvDRPhOKSG1rChWe"
+    ]
+    model_paths = ["model_EfficientNetB0-LSTM.keras", "model_EfficientNetB0-LSTM.h5", "saved_model"]
+
+    for url, path in zip(model_urls, model_paths):
+        if not os.path.exists(path):
+            download_file_from_gdrive(url, path)
+
+    model = None
+    for path in model_paths:
+        if os.path.exists(path):
+            if path.endswith(".keras") or path.endswith(".h5"):
+                model = load_model(path)
+            elif os.path.isdir(path):
+                model = tf.keras.models.load_model(path)
+            if model:
+                model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+                break
+
     tokenizer_path = "tokenizer.pkl"
     le_path = "label_encoder.pkl"
 
-    # Télécharger le modèle depuis Google Drive
-    model_path = "model_EfficientNetB0-LSTM.keras"
-    if not os.path.exists(model_path):
-        download_file_from_gdrive(model_url, model_path)
-    
-    model = load_model(model_path)
-    model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
     with open(tokenizer_path, 'rb') as handle:
         tokenizer = pickle.load(handle)
     with open(le_path, 'rb') as handle:
