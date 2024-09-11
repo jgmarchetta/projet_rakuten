@@ -8,18 +8,20 @@ import tensorflow as tf
 import torch
 import plotly.graph_objs as go
 import os
-import gdown
 
 from PIL import Image
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import load_model
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.preprocessing.sequence import pad_sequences # type: ignore
+from tensorflow.keras.preprocessing.image import load_img, img_to_array # type: ignore
+from tensorflow.keras.models import Sequential, load_model, Model # type: ignore
+from tensorflow.keras.layers import Dense, Input, Dropout, LSTM, Embedding, Concatenate, GlobalAveragePooling2D # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.utils import to_categorical # type: ignore
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, RandomSampler, Dataset, SequentialSampler
+from streamlit_elements import elements, mui
 
 # Définir la configuration de la page pour utiliser toute la largeur de l'écran
 st.set_page_config(layout="wide")
@@ -34,12 +36,12 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
     font-family: 'Arial', sans-serif;
 }
 .small-title {
-    font-size: 14px;
+    font-size: 14px;  /* Ajustez cette valeur selon vos besoins */
     font-weight: bold;
 }
 .reduced-spacing p {
-    margin-bottom: 5px;
-    margin-top: 5px;
+    margin-bottom: 5px;  /* Ajustez cette valeur selon vos besoins */
+    margin-top: 5px;     /* Ajustez cette valeur selon vos besoins */
 }
 .red-title {
     color: #BF0000;
@@ -56,6 +58,8 @@ body, h1, h2, h3, h4, h5, h6, p, div, span, li, a, input, button, .stText, .stMa
 # Injecter le CSS dans l'application Streamlit
 st.markdown(css, unsafe_allow_html=True)
 
+# st.sidebar.title("PROJET")
+
 # Ajouter le logo de Rakuten dans la barre latérale avec un lien hypertexte
 st.sidebar.markdown(f"""
 <a href="https://challengedata.ens.fr/participants/challenges/35/" target="_blank">
@@ -68,43 +72,13 @@ pages = ["Présentation", "Données", "Pré-processing", "Machine Learning", "De
 page = st.sidebar.radio("Aller vers:", pages)
 
 @st.cache_data
-def download_file_from_gdrive(url, output):
-    gdown.download(url, output, quiet=False)
-
-@st.cache_data
 def load_data(csv_path):
-    if not os.path.exists(csv_path):
-        url = "https://drive.google.com/uc?id=1dI7zqHcU1XhafXHNyk_339Oh6iPvqAzO"
-        download_file_from_gdrive(url, csv_path)
     return pd.read_csv(csv_path)
 
 @st.cache_data
-def load_model_and_tokenizer():
-    model_urls = [
-        "https://drive.google.com/uc?id=1zpL2QgpB38-Vp9zgC3f5lIXo5rfG_yja",
-        "https://drive.google.com/uc?id=1aCnpLSshh9k2V1FSt9M2FlfVi1jemn2O",
-        "https://drive.google.com/drive/folders/12HdIzlakwDZyO60JpvDRPhOKSG1rChWe"
-    ]
-    model_paths = ["model_EfficientNetB0-LSTM.keras", "model_EfficientNetB0-LSTM.h5", "saved_model"]
-
-    for url, path in zip(model_urls, model_paths):
-        if not os.path.exists(path):
-            download_file_from_gdrive(url, path)
-
-    model = None
-    for path in model_paths:
-        if os.path.exists(path):
-            if path.endswith(".keras") or path.endswith(".h5"):
-                model = load_model(path)
-            elif os.path.isdir(path):
-                model = tf.keras.models.load_model(path)
-            if model:
-                model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
-                break
-
-    tokenizer_path = "tokenizer.pkl"
-    le_path = "label_encoder.pkl"
-
+def load_model_and_tokenizer(model_path, tokenizer_path, le_path):
+    model = load_model(model_path)
+    model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])  # Ajout de la compilation du modèle
     with open(tokenizer_path, 'rb') as handle:
         tokenizer = pickle.load(handle)
     with open(le_path, 'rb') as handle:
@@ -440,7 +414,7 @@ elif page == "Machine Learning":
         st.write("")
         with st.expander("**Amélioration B** Score F1-pondéré: 0.79"):
             st.write("Détails sur Amélioration B.")
-            st.image("Ameb.png", caption=None, width=400)
+            st.image("ameb.png", caption=None, width=400)
 
     # Contenu du tab Optimisation
     with tabs[4]:
